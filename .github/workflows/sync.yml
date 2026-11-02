@@ -1,8 +1,9 @@
 name: Sync shared files
 
-# Pushes this product's templates onto every registered consumer's default branch, and creates its
-# labels. The consumers' `development` lines are never written here: their post-merge chore carries
-# the same files across inside the commit it already makes.
+# Pushes this product's templates onto every version line of every registered consumer - each
+# `<version>/main` and `<version>/development` - and creates its labels. Both halves matter: a push
+# runs the workflow file on the pushed branch and a pull request runs its base branch's copy, so a
+# branch without the file simply never gets shared checks.
 on:
   push:
     branches:

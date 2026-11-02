@@ -35,9 +35,10 @@ reads this repository's registry and runs the check types listed for that reposi
 - `types` — check types dispatched on its pull requests. May be empty: templates still sync.
 - `skip` — optional list of template paths this repository does not want.
 
-The sync targets the repository's **default branch** (its current version line's `main`); the
-`development` line receives the same files through that repository's post-merge chore, never
-directly.
+The sync targets **every version line** — each `<version>/main` and `<version>/development`, plus
+the repository's default branch. A workflow file only triggers on a branch that carries it (a push
+runs the file on the pushed branch, a pull request runs its base branch's copy), so writing only the
+default branch would leave every older Minecraft line with no shared checks at all.
 
 ## Check types
 
