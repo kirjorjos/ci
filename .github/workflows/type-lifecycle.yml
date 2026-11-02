@@ -32,7 +32,9 @@ jobs:
   suites:
     name: ${{ matrix.loader }}
     needs: loaders
-    runs-on: ubuntu-latest
+    # Same image as the captures job and the consumer's own CI: a `test<Loader>All` suite includes the
+    # screenshot task, whose baselines are byte-identical only on the image they were generated on.
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -45,4 +47,6 @@ jobs:
         with:
           loader: ${{ matrix.loader }}
           task: ${{ matrix.task }}
+          # Per-module run directory, so the leg's logs and reports are actually uploaded.
+          report-dir: src/${{ matrix.loader }}/mod/run
           artifact-name: lifecycle-${{ matrix.loader }}

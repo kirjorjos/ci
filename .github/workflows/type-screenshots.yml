@@ -33,7 +33,11 @@ jobs:
   captures:
     name: ${{ matrix.loader }}
     needs: loaders
-    runs-on: ubuntu-latest
+    # Pinned, not `ubuntu-latest`: a baseline tree is byte-identical only within one runner image
+    # (this image's Mesa/llvmpipe build). `ubuntu-latest` moving from 22.04 to newer llvmpipe made
+    # every capture of every loader differ from a tree generated on 22.04, which reads as "all
+    # baselines stale" rather than as a renderer change. The consumer's own CI pins the same image.
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -45,19 +49,22 @@ jobs:
         uses: kirjorjos/ci/minecraft-mods/types/screenshots/run@minecraft-mods/v1
         with:
           task: ${{ matrix.task }}
+          # The gradle run directory is per-module, not at the repository root.
+          captures-dir: src/${{ matrix.loader }}/mod/run/client/screenshots
 
       - name: Diff against baselines
         id: diff
         uses: kirjorjos/ci/minecraft-mods/types/screenshots/diff@minecraft-mods/v1
         with:
           loader: ${{ matrix.loader }}
+          captures-dir: src/${{ matrix.loader }}/mod/run/client/screenshots
 
       - name: Upload the captures
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: shots-${{ matrix.loader }}
-          path: run/client/screenshots
+          path: src/${{ matrix.loader }}/mod/run/client/screenshots
           if-no-files-found: warn
           retention-days: 7
 
