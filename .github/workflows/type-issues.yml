@@ -1,0 +1,47 @@
+name: Issues
+
+# Both checks are about an issue, never a pull request, so they are gated on the event that produced
+# them: `dispatch.yml` runs on every consumer event and every type workflow has to decide for itself
+# whether that event concerns it.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  version-check:
+    name: Validate affected versions
+    if: >-
+      github.event_name == 'issues' &&
+      (github.event.action == 'opened' ||
+       github.event.action == 'reopened' ||
+       github.event.action == 'edited')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the affected-version field
+        uses: kirjorjos/ci/minecraft-mods/types/issues/version-check@minecraft-mods/v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          repo: ${{ github.repository }}
+          issue-number: ${{ github.event.issue.number }}
+          event-action: ${{ github.event.action }}
+
+  confirm-version:
+    name: Confirmed-in labelling
+    if: github.event_name == 'issue_comment' && github.event.action == 'created'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply the versions the comment confirms
+        # `pull_request` is present on an issue that is a pull request; those are not issues.
+        if: github.event.issue.pull_request == null
+        uses: kirjorjos/ci/minecraft-mods/types/issues/confirm-version@minecraft-mods/v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          repo: ${{ github.repository }}
+          issue-number: ${{ github.event.issue.number }}
+          comment-body: ${{ github.event.comment.body }}
+          author-association: ${{ github.event.comment.author_association }}

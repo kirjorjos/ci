@@ -12,6 +12,8 @@ permissions:
 jobs:
   loaders:
     name: Read the loaders
+    # The dispatcher runs on issue and comment events too; captures belong to a pull request or a push.
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.read.outputs.matrix }}

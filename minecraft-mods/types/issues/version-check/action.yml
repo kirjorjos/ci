@@ -1,0 +1,53 @@
+name: Issue version check
+description: >-
+  Validates the issue form's affected-version field against the repository's `<version>/development`
+  branches, applies the `versions/<mc>` labels, and closes an issue whose versions cannot be worked.
+  Applies the `unaddressed` tag on open, so the tag means "CI has not said anything yet".
+inputs:
+  repo:
+    description: Repository the issue lives in, owner/name
+    required: true
+  issue-number:
+    description: Issue number to validate
+    required: true
+  field:
+    description: Heading of the form field holding the version list
+    required: false
+    default: Affected Minecraft versions
+  versions:
+    description: >-
+      Comma-separated supported versions. Empty means "read them from the branch list", which is the
+      default because a branch cannot claim a line the repository does not carry.
+    required: false
+    default: ""
+  event-action:
+    description: >-
+      The event action (opened, reopened, edited). Only `opened` applies the unaddressed tag; pass
+      nothing when the caller is not an issue event.
+    required: false
+    default: ""
+  label-on-open:
+    description: Label applied on `opened`, removed in the same step as any comment. Empty disables it.
+    required: false
+    default: unaddressed
+outputs:
+  versions:
+    description: Space-separated versions the issue was labelled with
+    value: ${{ steps.check.outputs.versions }}
+  closed:
+    description: "`true` when the issue was closed by the check"
+    value: ${{ steps.check.outputs.closed }}
+runs:
+  using: composite
+  steps:
+    - name: Validate the affected-version field
+      id: check
+      shell: bash
+      env:
+        REPO: ${{ inputs.repo }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        FIELD: ${{ inputs.field }}
+        VERSIONS: ${{ inputs.versions }}
+        EVENT_ACTION: ${{ inputs.event-action }}
+        LABEL_ON_OPEN: ${{ inputs.label-on-open }}
+      run: bash "${{ github.action_path }}/version-check.sh"

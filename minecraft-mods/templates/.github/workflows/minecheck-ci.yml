@@ -2,6 +2,9 @@
 #
 # It is identical in every consumer on purpose: it knows nothing about which checks this repository
 # runs. The dispatcher in kirjorjos/ci reads consumers.jsonl and decides that.
+#
+# Issue and comment events are here for the types that judge an issue (`issues`), not for the ones
+# that judge a pull request; each type workflow gates itself on the event that produced it.
 name: Shared CI
 on:
   pull_request:
@@ -9,10 +12,15 @@ on:
     branches:
       - "*/development"
       - "*/main"
+  issues:
+    types: [opened, reopened, edited]
+  issue_comment:
+    types: [created]
 permissions:
   contents: read
   pull-requests: write
   checks: write
+  issues: write
 jobs:
   dispatch:
     uses: kirjorjos/ci/.github/workflows/dispatch.yml@minecraft-mods/v1

@@ -1,0 +1,26 @@
+name: Scripts
+
+# Reports test scripts that nothing references. One job, one comment, no failure: this is a warning
+# about the pull request's tree, not a gate.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  coverage:
+    name: Script coverage
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Audit the script tree
+        uses: kirjorjos/ci/minecraft-mods/types/scripts/audit@minecraft-mods/v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          repo: ${{ github.repository }}
+          pr-number: ${{ github.event.pull_request.number }}

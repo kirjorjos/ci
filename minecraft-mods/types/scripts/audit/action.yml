@@ -1,0 +1,40 @@
+name: Script coverage audit
+description: >-
+  Warns on the pull request when a test script exists but nothing references it (issue #18). A script
+  is referenced when its file name appears anywhere outside itself: a Gradle task, the coordinator, a
+  driver file, or another script. Non-blocking by design - it reports, it never fails a PR.
+inputs:
+  repo:
+    description: Repository the pull request lives in, owner/name
+    required: true
+  pr-number:
+    description: Pull request to comment on. Empty runs the audit and writes only the step summary.
+    required: false
+    default: ""
+  scripts-dir:
+    description: Directory holding the Lua test scripts
+    required: false
+    default: tests/scripts
+  marker:
+    description: Hidden marker identifying this action's comment, so it is updated rather than repeated
+    required: false
+    default: "<!-- minecheck-script-coverage -->"
+outputs:
+  orphans:
+    description: Newline-separated script paths nothing references
+    value: ${{ steps.audit.outputs.orphans }}
+  count:
+    description: Number of unreferenced scripts
+    value: ${{ steps.audit.outputs.count }}
+runs:
+  using: composite
+  steps:
+    - name: Audit the script tree
+      id: audit
+      shell: bash
+      env:
+        REPO: ${{ inputs.repo }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        SCRIPTS_DIR: ${{ inputs.scripts-dir }}
+        MARKER: ${{ inputs.marker }}
+      run: bash "${{ github.action_path }}/audit.sh"

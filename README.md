@@ -45,6 +45,8 @@ directly.
 |---|---|---|
 | `screenshots` | pull request | `run`, `diff`, `comment`, `chore` |
 | `lifecycle` | pull request | `run` (one matrix leg per loader) |
+| `scripts` | pull request | `audit` |
+| `issues` | issue and issue-comment events | `version-check`, `confirm-version` |
 | `release-assets` | release workflows, by reference | `check` |
 
 `release-assets` is not dispatched: it asserts a staged release set, so it belongs in a release job,
@@ -57,6 +59,32 @@ not on a PR. Call it directly:
     version: "2.0.0"
     prefix: "MineCheck-"
 ```
+
+### Issue events
+
+The generated entry workflow also triggers on `issues` and `issue_comment`, which is what the
+`issues` type needs. Every type workflow gates itself on the event that produced it, because the
+dispatcher runs on all of them: `screenshots`, `lifecycle` and `scripts` only start on a
+`pull_request` or a `push`, `issues` only on its own events. Adding a type means deciding that gate.
+
+`issues/version-check` validates the affected-version field against the repository's
+`<version>/development` branches, applies `versions/<mc>`, and closes an issue naming a line that
+does not exist. It also applies `unaddressed` on `opened`, so the tag means "CI has not said
+anything yet".
+
+`issues/confirm-version` labels an issue when a **collaborator** comments `Confirmed in <version>`
+(comma-separated for several). The association is read from the event payload, so it needs no extra
+API scope and a stranger's comment is ignored without a lookup. A version with no development
+branch is skipped and reported in the step summary rather than labelled. Either action clears
+`unaddressed`, because CI has now said something about the issue.
+
+### Script coverage
+
+`scripts/audit` warns on the pull request when a file under `tests/scripts/` is referenced by
+nothing: the file name has to appear somewhere outside the script itself, which covers every real
+wiring (a Gradle task, the coordinator, a driver file, another script, a docs page) while still
+catching a script that looks like coverage and runs nowhere. One comment, upserted by marker and
+deleted when the tree is clean, and the job never fails.
 
 ## Adding a type
 

@@ -52,3 +52,21 @@ jobs:
     permissions:
       contents: read
     uses: kirjorjos/ci/.github/workflows/type-lifecycle.yml@minecraft-mods/v1
+
+  scripts:
+    name: Scripts
+    needs: resolve
+    if: contains(fromJSON(needs.resolve.outputs.types), 'scripts')
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: kirjorjos/ci/.github/workflows/type-scripts.yml@minecraft-mods/v1
+
+  issues:
+    name: Issues
+    needs: resolve
+    if: contains(fromJSON(needs.resolve.outputs.types), 'issues')
+    permissions:
+      contents: read
+      issues: write
+    uses: kirjorjos/ci/.github/workflows/type-issues.yml@minecraft-mods/v1

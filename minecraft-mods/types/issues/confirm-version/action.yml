@@ -1,0 +1,60 @@
+name: Confirm versions
+description: >-
+  Applies `versions/<mc>` labels when a collaborator comments `Confirmed in <version>[, <version>]` on
+  an issue. The author's association comes from the event payload rather than an API lookup, so the
+  action needs no push access and a stranger's comment is ignored without a query.
+inputs:
+  repo:
+    description: Repository the issue lives in, owner/name
+    required: true
+  issue-number:
+    description: Issue number the comment landed on
+    required: true
+  comment-body:
+    description: Body of the created comment
+    required: true
+  author-association:
+    description: >-
+      `author_association` from the comment payload: OWNER, MEMBER, COLLABORATOR, CONTRIBUTOR or NONE
+    required: true
+  allowed-associations:
+    description: Comma-separated associations allowed to confirm a version
+    required: false
+    default: OWNER, MEMBER, COLLABORATOR
+  prefix:
+    description: Text the comment must start with, case-insensitive
+    required: false
+    default: "Confirmed in "
+  versions:
+    description: >-
+      Comma-separated supported versions. Empty reads them from the `<version>/development` branches,
+      so a comment can never label an issue with a line that does not exist.
+    required: false
+    default: ""
+  clear-label:
+    description: Label removed once a version was applied, since CI has now said something. Empty disables it.
+    required: false
+    default: unaddressed
+outputs:
+  versions:
+    description: Space-separated versions applied
+    value: ${{ steps.confirm.outputs.versions }}
+  skipped:
+    description: Space-separated versions named by the comment that have no development branch
+    value: ${{ steps.confirm.outputs.skipped }}
+runs:
+  using: composite
+  steps:
+    - name: Apply the confirmed versions
+      id: confirm
+      shell: bash
+      env:
+        REPO: ${{ inputs.repo }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        COMMENT_BODY: ${{ inputs.comment-body }}
+        AUTHOR_ASSOCIATION: ${{ inputs.author-association }}
+        ALLOWED_ASSOCIATIONS: ${{ inputs.allowed-associations }}
+        CONFIRM_PREFIX: ${{ inputs.prefix }}
+        VERSIONS: ${{ inputs.versions }}
+        CLEAR_LABEL: ${{ inputs.clear-label }}
+      run: bash "${{ github.action_path }}/confirm-version.sh"
