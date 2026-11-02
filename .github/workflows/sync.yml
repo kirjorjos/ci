@@ -37,6 +37,29 @@ jobs:
           permission-contents: write
           permission-issues: write
 
+      # A token that cannot push makes every write inside sync.sh fail with the same 403; checking
+      # here names the cause (the app installation is missing contents: write) once, up front.
+      - name: Assert the token can push to every consumer
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          set -uo pipefail
+          failed=0
+          while IFS= read -r line; do
+            if [[ -z "${line//[[:space:]]/}" ]]; then continue; fi
+            if ! repo=$(jq -er '.repo' <<<"$line"); then continue; fi
+            if ! perms=$(gh api "repos/$repo" --jq .permissions 2>&1); then
+              echo "::error::$repo: the app token cannot read this repository: $perms"
+              failed=1
+              continue
+            fi
+            if [[ "$(jq -r '.push' <<<"$perms")" != "true" ]]; then
+              echo "::error::$repo: the app token cannot push (contents: write is not granted to the installation)"
+              failed=1
+            fi
+          done < consumers.jsonl
+          exit "$failed"
+
       - name: Sync
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}

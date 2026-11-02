@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Mirrors each registry entry's product templates onto that repository's default branch, and creates
 # its labels. One commit per consumer, only the paths that actually changed.
-set -euo pipefail
+#
+# `set -e` is not relied on for the per-consumer work: the loop calls `sync_repo` in a condition, and
+# bash disables errexit for the whole body of a function invoked that way. Every call that can fail is
+# therefore checked by hand, so a rejected write fails the run instead of being reported as a success.
+set -uo pipefail
 
 : "${GH_TOKEN:?}" "${SOURCE_SHA:?}"
 registry="${1:-consumers.jsonl}"
@@ -12,13 +16,26 @@ registry="${1:-consumers.jsonl}"
 
 failed=0
 
+# api <description> [gh api args...] — prints the response, or reports it and returns non-zero.
+api() {
+  local what="$1" out
+  shift
+  if ! out=$(gh api "$@" 2>&1); then
+    # stderr, so the cause survives being captured by the caller's `$(api ...)`.
+    echo "::error::$repo: $what failed: $out" >&2
+    return 1
+  fi
+  printf '%s' "$out"
+}
+
 sync_repo() {
   local repo="$1" product="$2" skip="$3" wants_labels="$4"
-  local branch base_sha base_tree entries='[]' changed=0 file rel blob current payload tree commit
+  local branch base_sha base_tree entries='[]' changed=0 file rel blob current payload tree commit ref
+  local line name ok
 
-  branch=$(gh api "repos/$repo" --jq .default_branch)
-  base_sha=$(gh api "repos/$repo/git/ref/heads/$branch" --jq .object.sha)
-  base_tree=$(gh api "repos/$repo/git/commits/$base_sha" --jq .tree.sha)
+  branch=$(api "reading the default branch" "repos/$repo" --jq .default_branch) || return 1
+  base_sha=$(api "reading the tip of $branch" "repos/$repo/git/ref/heads/$branch" --jq .object.sha) || return 1
+  base_tree=$(api "reading the tree of $base_sha" "repos/$repo/git/commits/$base_sha" --jq .tree.sha) || return 1
 
   while IFS= read -r file; do
     rel="${file#"$product"/templates/}"
@@ -29,10 +46,24 @@ sync_repo() {
 
     payload=$(mktemp)
     jq -n --rawfile content "$file" '{content: $content, encoding: "utf-8"}' > "$payload"
-    blob=$(gh api -X POST "repos/$repo/git/blobs" --input "$payload" --jq .sha)
+    if ! blob=$(api "creating a blob for $rel" -X POST "repos/$repo/git/blobs" --input "$payload" --jq .sha); then
+      rm -f "$payload"
+      return 1
+    fi
     rm -f "$payload"
 
-    current=$(gh api "repos/$repo/contents/$rel?ref=$branch" --jq .sha 2> /dev/null || true)
+    # A missing file is expected; anything else (an auth failure, most often) must not be read as one.
+    if current=$(gh api "repos/$repo/contents/$rel?ref=$branch" --jq .sha 2>&1); then
+      :
+    else
+      case "$current" in
+        *"Not Found"*) current="" ;;
+        *)
+          echo "::error::$repo: reading $rel failed: $current"
+          return 1
+          ;;
+      esac
+    fi
     if [[ "$current" == "$blob" ]]; then
       continue
     fi
@@ -48,27 +79,46 @@ sync_repo() {
     payload=$(mktemp)
     jq -n --arg base "$base_tree" --argjson entries "$entries" \
       '{base_tree: $base, tree: $entries}' > "$payload"
-    tree=$(gh api -X POST "repos/$repo/git/trees" --input "$payload" --jq .sha)
+    if ! tree=$(api "creating the tree" -X POST "repos/$repo/git/trees" --input "$payload" --jq .sha); then
+      rm -f "$payload"
+      return 1
+    fi
 
     jq -n --arg message "chore: sync shared CI ($SOURCE_SHA)" --arg tree "$tree" \
       --arg parent "$base_sha" '{message: $message, tree: $tree, parents: [$parent]}' > "$payload"
-    commit=$(gh api -X POST "repos/$repo/git/commits" --input "$payload" --jq .sha)
+    if ! commit=$(api "creating the commit" -X POST "repos/$repo/git/commits" --input "$payload" --jq .sha); then
+      rm -f "$payload"
+      return 1
+    fi
     rm -f "$payload"
 
-    gh api -X PATCH "repos/$repo/git/refs/heads/$branch" -f sha="$commit" --jq .object.sha > /dev/null
+    if ! ref=$(api "moving $branch" -X PATCH "repos/$repo/git/refs/heads/$branch" -f sha="$commit" --jq .object.sha); then
+      return 1
+    fi
+    if [[ "$ref" != "$commit" ]]; then
+      echo "::error::$repo: $branch points at $ref after the push, not $commit"
+      return 1
+    fi
     echo "Wrote $changed file(s) to $repo@$branch as ${commit:0:7}"
   fi
 
   if [[ "$wants_labels" == "true" ]]; then
-    local line
+    ok=0
     while IFS= read -r line; do
       if [[ -z "${line//[[:space:]]/}" ]]; then continue; fi
-      gh label create "$(jq -r .name <<<"$line")" \
+      name=$(jq -r .name <<<"$line")
+      if ! gh label create "$name" \
         --repo "$repo" \
         --color "$(jq -r .color <<<"$line")" \
         --description "$(jq -r '.description // ""' <<<"$line")" \
-        --force
+        --force > /dev/null; then
+        echo "::error::$repo: creating label '$name' failed"
+        ok=1
+      fi
     done < "$product/labels.jsonl"
+    if (( ok != 0 )); then
+      return 1
+    fi
     echo "Labels applied to $repo"
   fi
 }
