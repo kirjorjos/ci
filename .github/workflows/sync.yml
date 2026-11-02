@@ -11,6 +11,7 @@ on:
       - "minecraft-mods/**"
       - "consumers.jsonl"
       - "scripts/sync.sh"
+      - ".github/workflows/sync.yml"
   workflow_dispatch:
 
 permissions:
@@ -35,6 +36,9 @@ jobs:
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           permission-contents: write
+          # The templates include a workflow file, and a tree that touches .github/workflows needs
+          # this permission; without it the tree call 403s while plain blob writes still succeed.
+          permission-workflows: write
           permission-issues: write
 
       # Which app the secrets belong to, and whether its installation can write at all. Both answers
