@@ -1,0 +1,64 @@
+name: Release asset check
+description: >-
+  Asserts a staged release directory holds exactly the jars this version should publish, and writes
+  SHA256SUMS.txt over them. The product name is not baked in: `prefix` plus `name-format` describe
+  the naming, so only the Minecraft mod artifact shape is assumed.
+inputs:
+  minecraft-version:
+    description: Minecraft version this release targets
+    required: true
+  version:
+    description: Mod version this release publishes
+    required: true
+  prefix:
+    description: Literal prefix every jar name starts with, e.g. "MineCheck-"
+    required: false
+    default: ""
+  name-format:
+    description: >-
+      Suffix after the prefix, with {loader}, {mc}, {version} and {deobf} substituted. {deobf} is
+      empty for the loadable jar and "-deobf" for its development-names twin.
+    required: false
+    default: "{loader}-{mc}-{version}{deobf}.jar"
+  variants:
+    description: >-
+      Comma-separated values substituted into {deobf}, one jar expected per value. The default
+      expects the loadable jar and its "-deobf" twin; pass an empty string for a branch that ships
+      one jar per loader.
+    required: false
+    default: ",-deobf"
+  loaders-file:
+    description: 'JSONL file listing the loaders, one {"id": "..."} object per line'
+    required: false
+    default: .github/loaders.jsonl
+  artifacts-dir:
+    description: Directory the release attaches its assets from
+    required: false
+    default: build/artifacts
+  write-checksums:
+    description: Write SHA256SUMS.txt over the verified jars
+    required: false
+    default: "true"
+outputs:
+  assets:
+    description: Newline-separated paths of the verified release assets, checksum file included
+    value: ${{ steps.check.outputs.assets }}
+  count:
+    description: Number of jars verified
+    value: ${{ steps.check.outputs.count }}
+runs:
+  using: composite
+  steps:
+    - name: Verify the staged set
+      id: check
+      shell: bash
+      env:
+        ARTIFACTS_DIR: ${{ inputs.artifacts-dir }}
+        LOADERS_FILE: ${{ inputs.loaders-file }}
+        MC: ${{ inputs.minecraft-version }}
+        VERSION: ${{ inputs.version }}
+        PREFIX: ${{ inputs.prefix }}
+        NAME_FORMAT: ${{ inputs.name-format }}
+        VARIANTS: ${{ inputs.variants }}
+        WRITE_CHECKSUMS: ${{ inputs.write-checksums }}
+      run: bash "${{ github.action_path }}/check.sh"

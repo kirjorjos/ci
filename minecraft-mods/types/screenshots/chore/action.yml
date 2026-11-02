@@ -1,0 +1,41 @@
+name: Screenshot chore
+description: >-
+  Applies a merged run's captures to the baseline tree and commits them. This is the only writer of
+  `tests/baselines/**` on a development branch; the branch must already be checked out and writable.
+inputs:
+  loader:
+    description: Loader whose baseline subtree is written
+    required: true
+  list-file:
+    description: JSONL mismatch list produced by the diff action
+    required: false
+    default: .minecheck/shot-mismatches.jsonl
+  captures-dir:
+    description: Directory holding the captures to write
+    required: false
+    default: run/client/screenshots
+  baselines-dir:
+    description: Root of the baseline tree; the loader's subtree is <baselines-dir>/<loader>
+    required: false
+    default: tests/baselines
+  commit-subject:
+    description: Commit subject; {loader} is substituted
+    required: false
+    default: "chore: sync screenshot baselines ({loader})"
+outputs:
+  applied:
+    description: Number of captures written or removed
+    value: ${{ steps.chore.outputs.applied }}
+runs:
+  using: composite
+  steps:
+    - name: Apply the captures
+      id: chore
+      shell: bash
+      env:
+        LOADER: ${{ inputs.loader }}
+        LIST_FILE: ${{ inputs.list-file }}
+        CAPTURES_DIR: ${{ inputs.captures-dir }}
+        BASELINES_DIR: ${{ inputs.baselines-dir }}
+        COMMIT_SUBJECT: ${{ inputs.commit-subject }}
+      run: bash "${{ github.action_path }}/chore.sh"

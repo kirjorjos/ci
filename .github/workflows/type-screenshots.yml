@@ -1,0 +1,68 @@
+name: Screenshots
+
+# One matrix leg per loader: capture, diff against that loader's baseline tree, report the mismatches
+# on the pull request. The baseline tree is never written here; that is the chore's job after merge.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  loaders:
+    name: Read the loaders
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.read.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build the matrix
+        id: read
+        run: |
+          set -euo pipefail
+          matrix=$(jq -s -c '
+            map(select(.id)
+              | {loader: .id,
+                 task: ("test" + (.id[0:1] | ascii_upcase) + .id[1:] + "Shots")})
+          ' .github/loaders.jsonl)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  captures:
+    name: ${{ matrix.loader }}
+    needs: loaders
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.loaders.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Capture
+        uses: kirjorjos/ci/minecraft-mods/types/screenshots/run@minecraft-mods/v1
+        with:
+          task: ${{ matrix.task }}
+
+      - name: Diff against baselines
+        id: diff
+        uses: kirjorjos/ci/minecraft-mods/types/screenshots/diff@minecraft-mods/v1
+        with:
+          loader: ${{ matrix.loader }}
+
+      - name: Upload the captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shots-${{ matrix.loader }}
+          path: run/client/screenshots
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Report mismatches
+        if: steps.diff.outputs.has-mismatches == 'true' && github.event_name == 'pull_request'
+        uses: kirjorjos/ci/minecraft-mods/types/screenshots/comment@minecraft-mods/v1
+        with:
+          pr-number: ${{ github.event.pull_request.number }}
+          list-file: ${{ steps.diff.outputs.list-file }}
+          loader: ${{ matrix.loader }}

@@ -1,0 +1,44 @@
+name: Sync shared files
+
+# Pushes this product's templates onto every registered consumer's default branch, and creates its
+# labels. The consumers' `development` lines are never written here: their post-merge chore carries
+# the same files across inside the commit it already makes.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "minecraft-mods/**"
+      - "consumers.jsonl"
+      - "scripts/sync.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync every consumer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Mint the app token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: write
+          permission-issues: write
+
+      - name: Sync
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: bash scripts/sync.sh

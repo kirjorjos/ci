@@ -1,0 +1,40 @@
+name: Issue
+description: Bug report or enhancement request
+title: "[Issue]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing an issue. The **Affected Minecraft versions** field is checked
+        automatically; versions without a `<version>/development` branch are rejected.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - Bug
+        - Enhancement
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happens, what should happen, and how to reproduce it.
+    validations:
+      required: true
+  - type: input
+    id: affected-versions
+    attributes:
+      label: Affected Minecraft versions
+      description: Comma-separated, e.g. `1.19.2, 1.20.1`. Only versions with a `<version>/development` branch are accepted.
+      placeholder: "1.19.2"
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Logs, screenshots, related links.
+    validations:
+      required: false

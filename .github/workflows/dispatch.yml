@@ -1,0 +1,54 @@
+name: Dispatch checks
+
+# Called by the generated entry workflow in each consumer. It reads this repository's registry,
+# resolves the calling repository's check types, and runs one job per type that it lists.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    name: Resolve check types
+    runs-on: ubuntu-latest
+    outputs:
+      types: ${{ steps.registry.outputs.types }}
+    steps:
+      - name: Read this repository's registry entry
+        id: registry
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          content=$(gh api "repos/kirjorjos/ci/contents/consumers.jsonl" --jq .content \
+            | tr -d '\n' | base64 -d)
+          entry=$(jq -c --arg repo "$REPO" 'select(.repo == $repo)' <<<"$content")
+          if [[ -z "$entry" ]]; then
+            echo "::notice::$REPO is not registered in kirjorjos/ci; no shared checks run"
+            echo "types=[]" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          types=$(jq -c '.types // []' <<<"$entry")
+          echo "types=$types" >> "$GITHUB_OUTPUT"
+          echo "$REPO runs: $types"
+
+  # One job per known type. `jobs.<id>.uses` cannot be built from a matrix, so this list is the one
+  # place a new type is enumerated - see README, "Adding a type".
+  screenshots:
+    name: Screenshots
+    needs: resolve
+    if: contains(fromJSON(needs.resolve.outputs.types), 'screenshots')
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: kirjorjos/ci/.github/workflows/type-screenshots.yml@minecraft-mods/v1
+
+  lifecycle:
+    name: Lifecycle
+    needs: resolve
+    if: contains(fromJSON(needs.resolve.outputs.types), 'lifecycle')
+    permissions:
+      contents: read
+    uses: kirjorjos/ci/.github/workflows/type-lifecycle.yml@minecraft-mods/v1

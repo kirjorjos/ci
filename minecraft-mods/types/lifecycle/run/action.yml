@@ -1,0 +1,41 @@
+name: Lifecycle run
+description: >-
+  Runs one loader's lifecycle suite in a consumer repository. One invocation per matrix leg: the
+  fan-out lives in the calling workflow, because a composite action cannot declare a matrix.
+inputs:
+  loader:
+    description: Loader this leg covers
+    required: true
+  task:
+    description: Gradle task that runs the suite for this loader, e.g. testFabricAll
+    required: true
+  gradle-args:
+    description: Extra arguments passed to ./gradlew
+    required: false
+    default: --no-daemon --console=plain
+  report-dir:
+    description: Directory uploaded as this leg's artifact
+    required: false
+    default: run
+  artifact-name:
+    description: Name of the uploaded artifact
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Run the suite
+      id: run
+      shell: bash
+      env:
+        LOADER: ${{ inputs.loader }}
+        TASK: ${{ inputs.task }}
+        GRADLE_ARGS: ${{ inputs.gradle-args }}
+      run: bash "${{ github.action_path }}/run.sh"
+    - name: Upload this leg's reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ inputs.report-dir }}
+        if-no-files-found: warn
+        retention-days: 7

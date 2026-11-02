@@ -1,0 +1,46 @@
+name: Lifecycle
+
+# The fan-out lives here, not in the action: a composite action cannot declare a matrix. Each leg is
+# one loader's suite, and the job's own result is the single check a ruleset can require.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  loaders:
+    name: Read the loaders
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.read.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build the matrix
+        id: read
+        run: |
+          set -euo pipefail
+          matrix=$(jq -s -c '
+            map(select(.id)
+              | {loader: .id,
+                 task: ("test" + (.id[0:1] | ascii_upcase) + .id[1:] + "All")})
+          ' .github/loaders.jsonl)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  suites:
+    name: ${{ matrix.loader }}
+    needs: loaders
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.loaders.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run the suite
+        uses: kirjorjos/ci/minecraft-mods/types/lifecycle/run@minecraft-mods/v1
+        with:
+          loader: ${{ matrix.loader }}
+          task: ${{ matrix.task }}
+          artifact-name: lifecycle-${{ matrix.loader }}

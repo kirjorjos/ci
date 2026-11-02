@@ -1,0 +1,33 @@
+name: Screenshot mismatch comment
+description: >-
+  Creates or updates one sticky pull-request comment listing the captures that differ from the
+  baseline tree. Does nothing when the mismatch list is empty.
+inputs:
+  pr-number:
+    description: Pull request number to comment on
+    required: true
+  list-file:
+    description: JSONL mismatch list produced by the diff action
+    required: false
+    default: .minecheck/shot-mismatches.jsonl
+  loader:
+    description: Loader the list belongs to, shown in the comment
+    required: false
+    default: ""
+  marker:
+    description: Hidden marker used to find and update the existing comment
+    required: false
+    default: "<!-- kirjorjos-ci:shot-mismatches -->"
+runs:
+  using: composite
+  steps:
+    - name: Upsert the comment
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        PR: ${{ inputs.pr-number }}
+        LIST_FILE: ${{ inputs.list-file }}
+        LOADER: ${{ inputs.loader }}
+        MARKER: ${{ inputs.marker }}
+      run: bash "${{ github.action_path }}/comment.sh"

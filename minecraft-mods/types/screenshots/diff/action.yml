@@ -1,0 +1,42 @@
+name: Screenshot diff
+description: >-
+  Compares one run's captures against a loader's baseline tree and writes the mismatch list as JSONL.
+  No baseline semantics of its own: added, changed and deleted are decided by name and sha256 only.
+inputs:
+  loader:
+    description: Loader whose baseline subtree this run compares against
+    required: true
+  captures-dir:
+    description: Directory holding this run's captures
+    required: false
+    default: run/client/screenshots
+  baselines-dir:
+    description: Root of the baseline tree; the loader's subtree is <baselines-dir>/<loader>
+    required: false
+    default: tests/baselines
+  list-file:
+    description: Where to write the mismatch list
+    required: false
+    default: .minecheck/shot-mismatches.jsonl
+outputs:
+  list-file:
+    description: Path to the JSONL mismatch list, one {"capture","state"} object per line
+    value: ${{ steps.diff.outputs.list-file }}
+  changed:
+    description: Number of captures that differ from the baseline tree
+    value: ${{ steps.diff.outputs.changed }}
+  has-mismatches:
+    description: "true when any capture was added, changed or deleted"
+    value: ${{ steps.diff.outputs.has-mismatches }}
+runs:
+  using: composite
+  steps:
+    - name: Diff the captures
+      id: diff
+      shell: bash
+      env:
+        LOADER: ${{ inputs.loader }}
+        CAPTURES_DIR: ${{ inputs.captures-dir }}
+        BASELINES_DIR: ${{ inputs.baselines-dir }}
+        LIST_FILE: ${{ inputs.list-file }}
+      run: bash "${{ github.action_path }}/diff.sh"
