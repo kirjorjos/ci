@@ -37,26 +37,31 @@ jobs:
           permission-contents: write
           permission-issues: write
 
-      # A token that cannot push makes every write inside sync.sh fail with the same 403; checking
-      # here names the cause (the app installation is missing contents: write) once, up front.
-      - name: Assert the token can push to every consumer
+      # Which app the secrets belong to, and whether its installation can write at all. Both answers
+      # are property of the configured app, not of this workflow, and are the two things that go
+      # wrong when posts start failing with 403 halfway through sync.sh.
+      #
+      # The probe is a real write (a dangling blob, nothing is referenced) rather than
+      # `.permissions.push`: an installation token reports push=false there even when it can write.
+      - name: Assert the app can write to every consumer
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          INSTALLATION: ${{ steps.app.outputs.installation-id }}
         run: |
+          echo "app=$APP_SLUG installation=$INSTALLATION"
           set -uo pipefail
           failed=0
           while IFS= read -r line; do
             if [[ -z "${line//[[:space:]]/}" ]]; then continue; fi
             if ! repo=$(jq -er '.repo' <<<"$line"); then continue; fi
-            if ! perms=$(gh api "repos/$repo" --jq .permissions 2>&1); then
-              echo "::error::$repo: the app token cannot read this repository: $perms"
+            if ! out=$(gh api -X POST "repos/$repo/git/blobs" -f encoding=utf-8 \
+              -f content="probe" --jq .sha 2>&1); then
+              echo "::error::$repo: the app cannot write (contents: write is not granted to the installation): $out"
               failed=1
               continue
             fi
-            if [[ "$(jq -r '.push' <<<"$perms")" != "true" ]]; then
-              echo "::error::$repo: the app token cannot push (contents: write is not granted to the installation)"
-              failed=1
-            fi
+            echo "$repo: writable (probe blob ${out:0:7})"
           done < consumers.jsonl
           exit "$failed"
 
