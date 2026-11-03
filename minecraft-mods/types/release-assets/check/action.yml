@@ -28,9 +28,10 @@ inputs:
     required: false
     default: ",-deobf"
   loaders-file:
-    description: 'JSONL file listing the loaders, one {"id": "..."} object per line'
+    description: >-
+      The consumer's metadata file, whose `.loaders` array names the loaders a release publishes
     required: false
-    default: .github/loaders.jsonl
+    default: .github/metadata.json
   artifacts-dir:
     description: Directory the release attaches its assets from
     required: false

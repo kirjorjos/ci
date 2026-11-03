@@ -22,9 +22,11 @@ fail() {
 }
 
 [[ -d "$ARTIFACTS_DIR" ]] || fail "staging directory '$ARTIFACTS_DIR' does not exist"
-[[ -f "$LOADERS_FILE" ]] || fail "loader list '$LOADERS_FILE' does not exist"
+[[ -f "$LOADERS_FILE" ]] || fail "metadata file '$LOADERS_FILE' does not exist"
 
-mapfile -t LOADERS < <(jq -er '.id' "$LOADERS_FILE")
+# The consumer's own metadata file, not a bare loader list: loaders and the release's naming facts
+# live in one object so the set that gets built cannot disagree with the set that gets verified.
+mapfile -t LOADERS < <(jq -er '.loaders[]' "$LOADERS_FILE")
 (( ${#LOADERS[@]} > 0 )) || fail "'$LOADERS_FILE' lists no loaders"
 
 # An explicitly empty VARIANTS means one jar per loader whose {deobf} is empty, which is a real

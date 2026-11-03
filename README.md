@@ -33,6 +33,10 @@ reads this repository's registry and runs the check types listed for that reposi
 - `repo` — `owner/name`.
 - `product` — whose `templates/` and `labels.jsonl` the repository takes.
 - `types` — check types dispatched on its pull requests. May be empty: templates still sync.
+- `release` — release targets, read by the consumer's own release workflow: `gh` today, `cf` and
+  `modrinth` when those are wired. A target the array omits runs nothing, so adding one is a
+  registry change rather than a workflow edit. Absent or empty means the release publishes nowhere,
+  which the workflow refuses at the point it would tag.
 - `skip` — optional list of template paths this repository does not want.
 
 The sync targets **every version line** — each `<version>/main` and `<version>/development`, plus
