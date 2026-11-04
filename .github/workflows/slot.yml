@@ -1,0 +1,49 @@
+name: Test slot
+
+# Called by each consumer's generated `minecheck-slot.yml`. It does not launch anything: a pull
+# request's own run takes a place in the queue and blocks until it holds the slot
+# (`types/slot/run` with `mode: take`), because only that run's checks attach to the PR head and so
+# only it can satisfy a required context. This keeps the queue honest: it drops entries for closed
+# pull requests, queues the post-merge chore, reports positions, and reclaims a holder whose run
+# died before releasing.
+#
+# Every write is a compare-and-swap on the consumer's `ci-queue/<version>` branch, so running
+# concurrently with a waiter is safe and the schedule is a backstop, not a dependency.
+on:
+  workflow_call:
+    inputs:
+      force:
+        description: Clear a stuck holder on every line before reconciling.
+        required: false
+        type: string
+        default: "false"
+    secrets:
+      GH_APP_ID:
+        required: true
+      GH_APP_PRIVATE_KEY:
+        required: true
+
+permissions:
+  contents: write
+  checks: write
+  pull-requests: write
+
+jobs:
+  reconcile:
+    name: Reconcile the slot
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Mint an app token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      - name: Reconcile
+        uses: kirjorjos/ci/minecraft-mods/types/slot/run@minecraft-mods/v1
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        with:
+          mode: event
+          force: ${{ inputs.force }}

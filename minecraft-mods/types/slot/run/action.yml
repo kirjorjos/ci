@@ -1,0 +1,70 @@
+name: Test slot
+description: >-
+  One expensive run at a time per Minecraft version line. `take` enqueues a pull request and blocks
+  until it holds the slot, `release` hands the slot on, `event` is the scheduler's reconciliation.
+  The caller must mint an app token and pass it as `GH_TOKEN`: the queue lives on an orphan branch
+  (`ci-queue/<version>`) that this action pushes to.
+inputs:
+  mode:
+    description: >-
+      event (scheduler), reconcile, take (a pull request), take-chore (the post-merge chore),
+      release, status, hold, free
+    required: true
+  mc:
+    description: Version line, e.g. 1.19.2. Derived from `target` when empty.
+    required: false
+    default: ""
+  pr:
+    description: Pull request number, empty for a chore.
+    required: false
+    default: ""
+  sha:
+    description: The commit the slot is granted for (a PR head, or a merge commit for a chore).
+    required: false
+    default: ""
+  target:
+    description: The PR's base ref, or `<version>/development` for a chore.
+    required: false
+    default: ""
+  compare:
+    description: Passed through to the matrix as the baselines branch.
+    required: false
+    default: ""
+  fork:
+    description: "\"true\" when the pull request comes from a fork, which demotes it."
+    required: false
+    default: "false"
+  head-repo:
+    description: The pull request's head repository, recorded on the queue entry.
+    required: false
+    default: ""
+  minutes:
+    description: How long `take` waits for the grant before failing.
+    required: false
+    default: "90"
+  force:
+    description: For `event`/`reconcile`, clear a stuck holder before reconciling.
+    required: false
+    default: "false"
+outputs:
+  mc:
+    description: The version line this call resolved to.
+    value: ${{ steps.slot.outputs.mc }}
+runs:
+  using: composite
+  steps:
+    - name: Slot
+      id: slot
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        MC: ${{ inputs.mc }}
+        PR: ${{ inputs.pr }}
+        SHA: ${{ inputs.sha }}
+        TARGET: ${{ inputs.target }}
+        COMPARE: ${{ inputs.compare }}
+        FORK: ${{ inputs.fork }}
+        HEAD_REPO: ${{ inputs.head-repo }}
+        MINUTES: ${{ inputs.minutes }}
+        FORCE: ${{ inputs.force }}
+      run: bash "${{ github.action_path }}/run.sh"

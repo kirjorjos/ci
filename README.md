@@ -53,6 +53,7 @@ default branch would leave every older Minecraft line with no shared checks at a
 | `scripts` | pull request | `audit` |
 | `issues` | issue and issue-comment events | `version-check`, `confirm-version` |
 | `release-assets` | release workflows, by reference | `check` |
+| `slot` | not dispatched: called by a consumer's own jobs, plus the synced scheduler | `run` (`take`, `take-chore`, `release`, `event`) |
 
 `release-assets` is not dispatched: it asserts a staged release set, so it belongs in a release job,
 not on a PR. Call it directly:
@@ -63,6 +64,38 @@ not on a PR. Call it directly:
     minecraft-version: "1.19.2"
     version: "2.0.0"
     prefix: "MineCheck-"
+```
+
+### The test slot
+
+One expensive run at a time per Minecraft version line. The queue is an orphan branch
+`ci-queue/<version>` **in the consumer repository**, holding a single `queue.json`; every write is a
+read-modify-write whose `git push` is the compare-and-swap, so a lost race retries instead of losing
+an entry.
+
+Ordering is `(tier, seq)`: the post-merge chore and a release hold at `-1`, same-repo pull requests
+at `0`, forks at `1`. A fork is promoted after 45 minutes or three same-repo grants, so a busy day
+cannot starve it. A grant carries a 90-minute lease, and the synced scheduler reclaims a holder
+whose run died without releasing.
+
+A consumer wires two things:
+
+1. The synced `minecheck-slot.yml` runs the scheduler on pull-request close, push to
+   `*/development`, a ten-minute cron, and manual dispatch.
+2. Its own matrix calls `slot/run` with `mode: take` before the work and `mode: release` after it
+   (`if: always()`), because the required context has to be reported by the pull request's own run —
+   a dispatched run's checks attach to the default branch and could never satisfy it.
+
+```yaml
+- uses: kirjorjos/ci/minecraft-mods/types/slot/run@minecraft-mods/v1
+  env:
+    GH_TOKEN: ${{ steps.app.outputs.token }}
+  with:
+    mode: take
+    pr: ${{ github.event.pull_request.number }}
+    sha: ${{ github.event.pull_request.head.sha }}
+    target: ${{ github.event.pull_request.base.ref }}
+    fork: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
 ```
 
 ### Issue events
