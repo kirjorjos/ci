@@ -310,6 +310,13 @@ def prune(state: dict, force: bool) -> bool:
                 changed = True
                 continue
         elif entry["kind"] == "chore":
+            # Same identity rule as `enqueue`: work that already holds the slot is not also
+            # waiting in it. This also repairs a queue written before that guard existed.
+            live = state.get("holder") or {}
+            if live.get("kind") == "chore" and live.get("sha") == entry["sha"]:
+                log(f"dropping chore {entry['sha'][:7]}: it already holds the slot")
+                changed = True
+                continue
             previous = seen_chore.get(entry["target"])
             if previous is not None and previous > int(entry["seq"]):
                 changed = True
@@ -365,6 +372,19 @@ def reconcile(mc: str, force: bool = False) -> None:
 
 
 def enqueue(kind: str, mc: str, spec: dict) -> None:
+    def same(entry: dict) -> bool:
+        """Whether this entry (or holder) is the same piece of work as `spec`.
+
+        A line holds one version's work, so the commit alone identifies a chore; a pull request
+        is identified by its number. Target is deliberately not compared: it is what `mc` was
+        derived from, and on the shared unversioned line two refs can name the same commit.
+        """
+        if entry.get("kind") != kind:
+            return False
+        if kind == "pr":
+            return str(entry.get("pr")) == str(spec.get("pr"))
+        return entry.get("sha") == spec.get("sha")
+
     def decide(state: dict):
         before = json.dumps(state, sort_keys=True)
         # A chore is enqueued twice for one push: once by the scheduler (`event`) and once by the
@@ -372,21 +392,13 @@ def enqueue(kind: str, mc: str, spec: dict) -> None:
         # second one granted after the first releases, a phantom holder nobody is waiting on and
         # nobody releases, so they are collapsed by commit. Different pushes stay separate: each
         # one carries baselines the other does not.
-        state["entries"] = [
-            e for e in state.get("entries", [])
-            if not (
-                e["kind"] == kind
-                and (
-                    (kind == "pr" and str(e.get("pr")) == str(spec.get("pr")))
-                    or (
-                        kind == "chore"
-                        and e.get("target") == spec.get("target")
-                        and e.get("sha") == spec.get("sha")
-                    )
-                )
-            )
-        ]
-        state["entries"].append(make_entry(kind, spec, state))
+        state["entries"] = [e for e in state.get("entries", []) if not same(e)]
+        # The same commit can also already be the *holder*: whichever of the scheduler and
+        # `take-chore` wins the grant empties `entries`, so the collapse above finds nothing and
+        # this append would re-queue work already running. That entry is granted again the moment
+        # the holder releases, and nothing ever takes or releases it - a 90-minute block.
+        if not same(state.get("holder") or {}):
+            state["entries"].append(make_entry(kind, spec, state))
         return None if json.dumps(state, sort_keys=True) == before else state
 
     Line(mc).update(decide)
