@@ -5,9 +5,15 @@
 #
 # Issue and comment events are here for the types that judge an issue (`issues`), not for the ones
 # that judge a pull request; each type workflow gates itself on the event that produced it.
+#
+# `pull_request_target` is here for the types that must act on the pull request itself (`rules`:
+# comment, close). It runs in the base repository's context, so its token can write on a fork's
+# pull request; those types are gated to this event alone so nothing runs twice per push.
 name: Shared CI
 on:
   pull_request:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, closed]
   push:
     branches:
       - "*/development"

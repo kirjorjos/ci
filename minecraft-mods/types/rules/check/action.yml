@@ -1,0 +1,75 @@
+name: PR rules
+description: >-
+  Judges a pull request's shape and acts on the verdict. `<version>/development` accepts only
+  `<version>/development-issue-<n>` of the same version, naming a positive issue number that
+  resolves to a real issue (not a pull request); `<version>/main` accepts only the release job's
+  promotion; every other target accepts any source. An invalid pull request is commented on, closed
+  and failed; a loader removed from the metadata file is announced; a merged development PR records
+  `Fixed in <version>` on its issue; and a valid one whose source issue is closed or lacks
+  `versions/<version>` gets a non-blocking remark saying so.
+inputs:
+  repo:
+    description: Repository the pull request lives in, owner/name
+    required: true
+  pr-number:
+    description: Pull request number
+    required: true
+  event-action:
+    description: >-
+      The event action (opened, synchronize, closed, ...). `closed` only records `Fixed in`; every
+      other action validates.
+    required: true
+  base-ref:
+    description: The pull request's target branch
+    required: true
+  head-ref:
+    description: The pull request's source branch
+    required: true
+  head-repo:
+    description: >-
+      The source repository, owner/name. A fork's pull request may target `<version>/development`
+      but never `<version>/main`.
+    required: true
+  author:
+    description: Login of the pull request's author, checked against the release bot for `main`
+    required: true
+  merged:
+    description: Whether the closed event was a merge. Only a merge records `Fixed in`.
+    required: false
+    default: "false"
+  base-sha:
+    description: Commit the pull request targets, used to read the base loader list
+    required: false
+    default: ""
+  head-sha:
+    description: Commit the pull request proposes, used to read the head loader list
+    required: false
+    default: ""
+outputs:
+  valid:
+    description: Whether the pull request's shape is allowed (true/false)
+    value: ${{ steps.check.outputs.valid }}
+  target-type:
+    description: development, main, issue or other
+    value: ${{ steps.check.outputs.target-type }}
+  version:
+    description: The version line the target names, empty for an ungated target
+    value: ${{ steps.check.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - name: Judge the pull request's shape
+      id: check
+      shell: bash
+      env:
+        REPO: ${{ inputs.repo }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        EVENT_ACTION: ${{ inputs.event-action }}
+        BASE_REF: ${{ inputs.base-ref }}
+        HEAD_REF: ${{ inputs.head-ref }}
+        HEAD_REPO: ${{ inputs.head-repo }}
+        AUTHOR: ${{ inputs.author }}
+        MERGED: ${{ inputs.merged }}
+        BASE_SHA: ${{ inputs.base-sha }}
+        HEAD_SHA: ${{ inputs.head-sha }}
+      run: bash "${{ github.action_path }}/check.sh"

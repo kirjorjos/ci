@@ -83,3 +83,15 @@ jobs:
       contents: read
       issues: write
     uses: kirjorjos/ci/.github/workflows/type-issues.yml@minecraft-mods/v1
+
+  # The one type that runs on `pull_request_target` rather than `pull_request`: it comments on and
+  # closes pull requests, which a fork's read-only token cannot do. It never checks the PR out.
+  rules:
+    name: Rules
+    needs: resolve
+    if: contains(fromJSON(needs.resolve.outputs.types), 'rules')
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    uses: kirjorjos/ci/.github/workflows/type-rules.yml@minecraft-mods/v1

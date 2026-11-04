@@ -28,6 +28,20 @@ development line, the release job guarantees the three facts that make it legiti
 validates again on its post-merge push. The run still appears, with one `resolve` job and a notice
 saying why, so a promotion PR shows no matrix and nothing can sit on it until it expires.
 
+### Pull request shape
+
+`rules` is the one type that runs on `pull_request_target` instead of `pull_request`. It judges
+`<version>/development` (source must be `<version>/development-issue-<n>` of the same version),
+`<version>/main` (release job only) and everything else (a plain contribution: any source, forks
+included). An invalid pull request is commented on, closed and failed; a loader dropped from the
+metadata file is announced; a merged development pull request records `Fixed in <version>` on its
+issue.
+
+It needs that trigger because it writes: a fork's `pull_request` token is read-only, so those
+comments and closes would silently fail. It never checks the pull request out - the loader lists it
+compares are read through the contents API at the base and head SHAs - so the write token never
+meets PR content. The type is gated to this one event, so nothing runs twice per push.
+
 ## Registry
 
 `consumers.jsonl`, one object per line:
@@ -58,6 +72,7 @@ default branch would leave every older Minecraft line with no shared checks at a
 | `lifecycle` | pull request | `run` (one matrix leg per loader) |
 | `scripts` | pull request | `audit` |
 | `issues` | issue and issue-comment events | `version-check`, `confirm-version` |
+| `rules` | pull request, on `pull_request_target` | `check` |
 | `release-assets` | release workflows, by reference | `check` |
 | `slot` | not dispatched: called by a consumer's own jobs, plus the synced scheduler | `run` (`take`, `take-chore`, `release`, `event`) |
 
