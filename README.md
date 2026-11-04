@@ -22,6 +22,12 @@ Spec: `.notes/shared-ci-repo-spec.md` in the minecheck repo.
 carries. It is identical everywhere and overwritten on every sync: it calls `dispatch.yml`, which
 reads this repository's registry and runs the check types listed for that repository.
 
+One case is decided by the dispatcher rather than the entry file: a pull request whose base is a
+`<version>/main` line is a **promotion**, and it resolves to no types. Its tests already ran on the
+development line, the release job guarantees the three facts that make it legitimate, and `main`
+validates again on its post-merge push. The run still appears, with one `resolve` job and a notice
+saying why, so a promotion PR shows no matrix and nothing can sit on it until it expires.
+
 ## Registry
 
 `consumers.jsonl`, one object per line:

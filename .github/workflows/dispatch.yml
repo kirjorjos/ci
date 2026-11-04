@@ -20,8 +20,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
+
+          # A promotion PR (`<mc>/development` -> `<mc>/main`) resolves to no types. Its tests already
+          # ran on the version line, the release job owns the three facts that make it legitimate, and
+          # `main` validates again on the post-merge push. Deciding it here rather than in the synced
+          # entry workflow keeps that file identical in every consumer, and keeps GitHub's fork
+          # approval gate from turning a run nobody needs into a red zero-job failure.
+          if [[ "$EVENT_NAME" == "pull_request" && "$BASE_REF" == */main ]]; then
+            echo "::notice::$BASE_REF is a promotion target; its tests ran on the version line"
+            echo "types=[]" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           content=$(gh api "repos/kirjorjos/ci/contents/consumers.jsonl" --jq .content \
             | tr -d '\n' | base64 -d)
           entry=$(jq -c --arg repo "$REPO" 'select(.repo == $repo)' <<<"$content")
