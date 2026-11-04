@@ -58,6 +58,7 @@ runs:
       shell: bash
       env:
         MODE: ${{ inputs.mode }}
+        REPO: ${{ github.repository }}
         MC: ${{ inputs.mc }}
         PR: ${{ inputs.pr }}
         SHA: ${{ inputs.sha }}

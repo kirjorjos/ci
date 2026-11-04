@@ -43,6 +43,7 @@ LEASE_MINUTES = 90
 
 TIERS = {"chore": -1, "release": -1}
 FORK_TIER = 1
+BOT = re.compile(r"\[bot\]$")
 VERSION = re.compile(r"^[0-9]+(?:\.[0-9]+){1,2}$")
 CHORE_NAME = "Post-merge screenshot baselines"
 UNVERSIONED = "unversioned"  # the shared line for targets that name no Minecraft version
@@ -255,15 +256,6 @@ def pr_info(number: int | str) -> dict | None:
         return None
 
 
-def merged_pr(sha: str) -> str:
-    proc = gh(
-        ["api", f"repos/{repo()}/commits/{sha}/pulls",
-         "--jq", "[.[] | select(.merged_at != null)][0].number // empty"],
-        check=False,
-    )
-    return proc.stdout.strip()
-
-
 def put_check(sha: str, status: str, conclusion: str | None, title: str, summary: str) -> None:
     """Best effort: a fork's head commit is not in this repository, so its check cannot attach."""
     if not sha:
@@ -375,9 +367,24 @@ def reconcile(mc: str, force: bool = False) -> None:
 def enqueue(kind: str, mc: str, spec: dict) -> None:
     def decide(state: dict):
         before = json.dumps(state, sort_keys=True)
+        # A chore is enqueued twice for one push: once by the scheduler (`event`) and once by the
+        # post-merge workflow's own `take-chore`. Two entries for the same commit would leave the
+        # second one granted after the first releases, a phantom holder nobody is waiting on and
+        # nobody releases, so they are collapsed by commit. Different pushes stay separate: each
+        # one carries baselines the other does not.
         state["entries"] = [
             e for e in state.get("entries", [])
-            if not (kind == "pr" and e["kind"] == "pr" and str(e.get("pr")) == str(spec.get("pr")))
+            if not (
+                e["kind"] == kind
+                and (
+                    (kind == "pr" and str(e.get("pr")) == str(spec.get("pr")))
+                    or (
+                        kind == "chore"
+                        and e.get("target") == spec.get("target")
+                        and e.get("sha") == spec.get("sha")
+                    )
+                )
+            )
         ]
         state["entries"].append(make_entry(kind, spec, state))
         return None if json.dumps(state, sort_keys=True) == before else state
@@ -398,15 +405,22 @@ def drop_pr(mc: str, number: int | str) -> None:
 
 
 def holds(mc: str, pr: int | str, sha: str) -> bool:
+    """Whether this caller's commit holds the slot.
+
+    A chore has no pull request to compare: the post-merge workflow cannot know the merged number
+    before the slot is granted, so it passes none and the commit is the whole identity.
+    """
     holder = Line(mc).read()[0].get("holder") or {}
-    return str(holder.get("pr")) == str(pr) and holder.get("sha") == sha
+    return (not str(pr) or str(holder.get("pr")) == str(pr)) and holder.get("sha") == sha
 
 
 def release(mc: str, pr: int | str, sha: str) -> None:
     def decide(state: dict):
         holder = state.get("holder") or {}
-        if str(holder.get("pr")) != str(pr) or holder.get("sha") != sha:
-            return None  # not ours: a re-push already handed the slot on
+        # Same identity rule as `holds`: a caller that named no pull request is identified by its
+        # commit alone. A mismatch is not an error - a re-push already handed the slot on.
+        if (str(pr) and str(holder.get("pr")) != str(pr)) or holder.get("sha") != sha:
+            return None
         state["holder"] = None
         if str(pr):
             state.setdefault("last_runs", {})[str(pr)] = {"sha": sha, "at": iso(now())}
@@ -467,9 +481,21 @@ def on_push(payload: dict) -> None:
     if message and message[0].startswith("chore: sync screenshot baselines"):
         log("this push is the chore's own; not queueing it")
         return
+    # The same two guards as the post-merge workflow's `slot` job, and they have to stay identical:
+    # that job is what takes and releases a granted chore. A push it skips (a shared-CI sync, say)
+    # still arrives here, and queueing a chore for it would be granted within seconds at tier -1 and
+    # then held for the whole 90-minute lease by nobody at all, blocking the line.
+    pusher = (
+        (payload.get("pusher") or {}).get("name")
+        or (payload.get("sender") or {}).get("login")
+        or ""
+    )
+    if BOT.search(pusher):
+        log(f"pushed by {pusher}, which the chore skips; not queueing it")
+        return
     mc = line_of(ref)
     sha = payload["after"]
-    enqueue("chore", mc, {"pr": merged_pr(sha), "sha": sha, "target": ref, "compare": ""})
+    enqueue("chore", mc, {"pr": "", "sha": sha, "target": ref, "compare": ""})
     reconcile(mc)
 
 
