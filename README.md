@@ -18,9 +18,25 @@ Spec: `.notes/shared-ci-repo-spec.md` in the minecheck repo.
 | `<product>/labels.jsonl` | labels in the repo | `gh label create --force` during the same sync |
 | `<product>/types/*` | nothing — actions are called by reference | `uses: kirjorjos/ci/<product>/types/<type>/<action>@<product>/v1` |
 
-`<product>/templates/.github/workflows/minecheck-ci.yml` is the one generated workflow a consumer
-carries. It is identical everywhere and overwritten on every sync: it calls `dispatch.yml`, which
-reads this repository's registry and runs the check types listed for that repository.
+`<product>/templates/.github/workflows/` is where a consumer's CI actually lives. Every file there
+is overwritten on each sync, so a consumer's copy is never the place to make a change:
+
+| File | What it is |
+|---|---|
+| `minecheck-ci.yml` | the entry workflow: calls `dispatch.yml`, which reads this repository's registry and runs the check types listed for that repository |
+| `minecheck-slot.yml` | when the per-version test-slot scheduler runs |
+| `pr-validation.yml` | a pull request's matrix: wait for the shared rules verdict, take this version line's slot, run `ci.yml` on the head, hand the slot back |
+| `ci.yml` | the build matrix: plan, formatting plus plugin tests, one test job per loader, one aggregate verdict |
+| `pr-screenshot-comment.yml` | the mismatch table and its required check, once a validation run finishes |
+| `post-merge-screenshot-sync.yml` | the post-merge chore: write the merged run's captures into `tests/baselines/` and comment the source issue |
+
+What deliberately stays in a consumer: `release.yml`, whose GPG-free build, publish and tagging
+steps are tied to one version line, and anything a product type does not own at all.
+
+A repository that appears in the registry but is not wired for a piece of this — no baselines, no
+slot, a different build — says so with `skip` rather than by keeping a divergent copy. MineCam
+takes the product's templates but skips the four matrix workflows, so it gets the entry workflow and
+the slot scheduler and nothing that would try to run a suite it does not have.
 
 One case is decided by the dispatcher rather than the entry file: a pull request whose base is a
 `<version>/main` line is a **promotion**, and it resolves to no types. Its tests already ran on the
@@ -42,6 +58,22 @@ comments and closes would silently fail. It never checks the pull request out - 
 compares are read through the contents API at the base and head SHAs - so the write token never
 meets PR content. The type is gated to this one event, so nothing runs twice per push.
 
+## Consumer configuration
+
+`.github/metadata.json` in the consumer is the only configuration any shared workflow reads. Nothing
+above carries a repository name, a loader list, a path or a Gradle property: those come from this
+file or from the layout the product already assumes.
+
+| Key | Read by | Meaning |
+|---|---|---|
+| `loaders` | `ci.yml` plan, `rules` | loader ids, `[a-z0-9][a-z0-9-]*`; one test job and one `tests/baselines/<id>/` tree each |
+| `build.jdk` | `ci.yml` | JDK the line builds with; default `17` |
+| `build.checkTask` | `ci.yml` | Gradle task covering formatting plus the plugin's own tests; default `checkModule` |
+| `release` | the consumer's `release.yml`, `release-assets` | jar prefix, name format, variants (`-deobf`) and staging directory |
+
+Every key is optional apart from `loaders`, and each default reproduces what the workflow ran
+before the key existed, so a line that declares none of them behaves exactly as it did.
+
 ## Registry
 
 `consumers.jsonl`, one object per line:
@@ -57,7 +89,9 @@ meets PR content. The type is gated to this one event, so nothing runs twice per
   `modrinth` when those are wired. A target the array omits runs nothing, so adding one is a
   registry change rather than a workflow edit. Absent or empty means the release publishes nowhere,
   which the workflow refuses at the point it would tag.
-- `skip` — optional list of template paths this repository does not want.
+- `skip` — optional list of template paths this repository does not want, given as the path under
+  `templates/` (`.github/workflows/ci.yml`). Used by a consumer that takes the product's entry
+  workflow but has no matrix of its own to run.
 
 The sync targets **every version line** — each `<version>/main` and `<version>/development`, plus
 the repository's default branch. A workflow file only triggers on a branch that carries it (a push
