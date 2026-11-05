@@ -1,2 +1,2 @@
-{"repo":"kirjorjos/Minecheck","product":"minecraft-mods","types":["screenshots","lifecycle","scripts","issues","rules"],"release":["gh"]}
-{"repo":"kirjorjos/MineCam","product":"minecraft-mods","types":["issues"],"release":["gh"],"skip":[".github/workflows/ci.yml",".github/workflows/pr-validation.yml",".github/workflows/pr-screenshot-comment.yml",".github/workflows/post-merge-screenshot-sync.yml"]}
+{"repo":"kirjorjos/Minecheck","product":"minecraft-mods","types":["screenshots","lifecycle","scripts","issues","rules"],"release":["gh"],"remove":[".github/workflows/issue-version-check.yml"]}
+{"repo":"kirjorjos/MineCam","product":"minecraft-mods","types":["issues"],"release":["gh"],"skip":[".github/workflows/ci.yml",".github/workflows/pr-validation.yml",".github/workflows/pr-screenshot-comment.yml",".github/workflows/post-merge-screenshot-sync.yml",".github/workflows/release.yml"]}

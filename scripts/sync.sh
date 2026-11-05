@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Mirrors each registry entry's product templates onto every version line of that repository, and
-# creates its labels. One commit per branch, only the paths that actually changed.
+# Mirrors each registry entry's product templates onto every version line of that repository,
+# deletes the paths the registry retires, and creates its labels. One commit per branch, only the
+# paths that actually changed.
 #
 # "Every version line" is each `<version>/main` and `<version>/development` branch, plus the
 # repository's default branch: a workflow file only triggers on a branch that carries it (pushes run
@@ -45,7 +46,7 @@ version_lines() {
 }
 
 sync_repo() {
-  local repo="$1" product="$2" skip="$3" wants_labels="$4"
+  local repo="$1" product="$2" skip="$3" wants_labels="$4" prune="$5"
   local branch base_sha base_tree entries changed=0 file rel blob current payload tree commit ref i
   local line name ok
   local -a branches=() paths=() blobs=()
@@ -106,6 +107,28 @@ sync_repo() {
         '. + [{path: $path, mode: "100644", type: "blob", sha: $sha}]' <<<"$entries")
       changed=$((changed + 1))
     done
+
+    # Retired paths. A workflow only stops running once the branch that carries it no longer does,
+    # and `*/main` takes no ordinary pull request, so a hand PR could only ever clean up
+    # `*/development` and leave the default branch running the file for another release. The app
+    # token is a bypass actor on both rulesets, so this is the one write that can reach every line.
+    # Absent is the steady state, which makes a second sync a no-op.
+    while IFS= read -r rel; do
+      [[ -n "$rel" ]] || continue
+      if ! current=$(gh api "repos/$repo/contents/$rel?ref=$branch" --jq .sha 2>&1); then
+        case "$current" in
+          *"Not Found"*) continue ;;
+          *)
+            echo "::error::$repo: reading $rel from $branch failed: $current"
+            return 1
+            ;;
+        esac
+      fi
+      entries=$(jq -c --arg path "$rel" \
+        '. + [{path: $path, mode: "100644", type: "blob", sha: null}]' <<<"$entries")
+      changed=$((changed + 1))
+      echo "removing $rel from $branch"
+    done < <(jq -r '.[]?' <<<"$prune")
 
     if (( changed == 0 )); then
       echo "$repo@$branch already matches this commit"
@@ -179,7 +202,7 @@ while IFS= read -r line; do
   fi
 
   echo "::group::$repo ($product)"
-  if ! sync_repo "$repo" "$product" "$(jq -c '.skip // []' <<<"$line")" "$(jq -r '.labels // true' <<<"$line")"; then
+  if ! sync_repo "$repo" "$product" "$(jq -c '.skip // []' <<<"$line")" "$(jq -r '.labels // true' <<<"$line")" "$(jq -c '.remove // []' <<<"$line")"; then
     echo "::error::$repo did not finish syncing"
     failed=1
   fi

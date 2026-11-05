@@ -29,14 +29,18 @@ is overwritten on each sync, so a consumer's copy is never the place to make a c
 | `ci.yml` | the build matrix: plan, formatting plus plugin tests, one test job per loader, one aggregate verdict |
 | `pr-screenshot-comment.yml` | the mismatch table and its required check, once a validation run finishes |
 | `post-merge-screenshot-sync.yml` | the post-merge chore: write the merged run's captures into `tests/baselines/` and comment the source issue |
+| `release.yml` | the release loop: bump, promote, tag, build, stage and publish one line at a time |
 
-What deliberately stays in a consumer: `release.yml`, whose GPG-free build, publish and tagging
-steps are tied to one version line, and anything a product type does not own at all.
+Nothing under a consumer's `.github/workflows/` is hand-written any more, and a file edited there is
+overwritten on the next sync. What used to differ between version lines is now either metadata (the
+jar prefix, the variants a line ships, the staging directory) or the registry (which release targets
+publish).
 
 A repository that appears in the registry but is not wired for a piece of this — no baselines, no
-slot, a different build — says so with `skip` rather than by keeping a divergent copy. MineCam
-takes the product's templates but skips the four matrix workflows, so it gets the entry workflow and
-the slot scheduler and nothing that would try to run a suite it does not have.
+slot, a different build — says so with `skip` rather than by keeping a divergent copy. MineCam takes
+the product's templates but skips the matrix and release workflows, so it gets the entry workflow
+and the slot scheduler and nothing that would try to run a suite or a release it has no
+configuration for.
 
 One case is decided by the dispatcher rather than the entry file: a pull request whose base is a
 `<version>/main` line is a **promotion**, and it resolves to no types. Its tests already ran on the
@@ -72,7 +76,10 @@ file or from the layout the product already assumes.
 | `release` | the consumer's `release.yml`, `release-assets` | jar prefix, name format, variants (`-deobf`) and staging directory |
 
 Every key is optional apart from `loaders`, and each default reproduces what the workflow ran
-before the key existed, so a line that declares none of them behaves exactly as it did.
+before the key existed, so a line that declares none of them behaves exactly as it did. The release
+loop reads `release.prefix`, `release.variants` and `release.artifactsDir` to decide which jars must
+be staged and which names belong to the tag: a line that ships one jar and a line that ships a
+`-deobf` twin run the same check.
 
 ## Registry
 
@@ -92,6 +99,10 @@ before the key existed, so a line that declares none of them behaves exactly as 
 - `skip` — optional list of template paths this repository does not want, given as the path under
   `templates/` (`.github/workflows/ci.yml`). Used by a consumer that takes the product's entry
   workflow but has no matrix of its own to run.
+- `remove` — optional list of repository paths to delete from every version line on each sync. This
+  is how a retired workflow leaves `*/main`: that branch takes no ordinary pull request, so the only
+  thing that can take a file away from it is a write carrying the app's bypass. Absent is the steady
+  state, so a second sync deletes nothing.
 
 The sync targets **every version line** — each `<version>/main` and `<version>/development`, plus
 the repository's default branch. A workflow file only triggers on a branch that carries it (a push
