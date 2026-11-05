@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Read the JDK
+      - name: Read the JDKs
         id: jdk
         run: |-
           set -euo pipefail
@@ -27,13 +27,26 @@ jobs:
             echo "::error::no .github/metadata.json; it names the JDK this repository builds with"
             exit 1
           fi
-          echo "jdk=$(jq -r '.build.jdk // 17' .github/metadata.json)" >> "$GITHUB_OUTPUT"
+          # setup-java makes the last version it installs the launcher JVM, so `.build.jdk` goes
+          # last: it runs Gradle, while a `.build.toolchains` entry is what the project compiles
+          # with. A Loom build can need both - Gradle cannot even configure on 17, while the
+          # project's own toolchain is still 17 - and a consumer that declares neither gets 17.
+          {
+            jq -r '.build.toolchains[]?' .github/metadata.json
+            jq -r '.build.jdk // 17' .github/metadata.json
+          } > "$RUNNER_TEMP/jdks.txt"
+          {
+            echo "versions<<JDKS"
+            cat "$RUNNER_TEMP/jdks.txt"
+            echo "JDKS"
+          } >> "$GITHUB_OUTPUT"
+          echo "launcher=$(tail -1 "$RUNNER_TEMP/jdks.txt")" >> "$GITHUB_OUTPUT"
 
-      - name: Set up JDK ${{ steps.jdk.outputs.jdk }}
+      - name: Set up JDK ${{ steps.jdk.outputs.launcher }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: ${{ steps.jdk.outputs.jdk }}
+          java-version: ${{ steps.jdk.outputs.versions }}
 
       - name: Build
         uses: kirjorjos/ci/minecraft-mods/types/build/run@minecraft-mods/v1
