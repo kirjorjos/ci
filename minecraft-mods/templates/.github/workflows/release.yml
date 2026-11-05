@@ -643,13 +643,7 @@ jobs:
             if (( ${#VARIANTS[@]} == 0 )); then
               VARIANTS=("")
             fi
-            mapfile -t LOADER_IDS < <(
-              if jq -e '.loaders' "$META" > /dev/null 2>&1; then
-                jq -r '.loaders[]' "$META"
-              else
-                jq -r 'select(.id != null) | .id' .github/loaders.jsonl
-              fi
-            )
+            mapfile -t LOADER_IDS < <(jq -r '.loaders[]?' "$META")
             if (( ${#LOADER_IDS[@]} == 0 )); then
               echo "::error::$META names no loaders"
               exit 1

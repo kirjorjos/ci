@@ -22,22 +22,16 @@ jobs:
         id: read
         run: |
           set -euo pipefail
-          # `.github/metadata.json` is the current shape. A version line that still carries the older
-          # `loaders.jsonl` keeps working until it is migrated; the fallback goes when every line has
-          # the metadata file.
-          if [[ -f .github/metadata.json ]]; then
-            matrix=$(jq -c '
-              [.loaders[]
-                | {loader: .,
-                   task: ("test" + (.[0:1] | ascii_upcase) + .[1:] + "All")}]
-            ' .github/metadata.json)
-          else
-            matrix=$(jq -s -c '
-              map(select(.id)
-                | {loader: .id,
-                   task: ("test" + (.id[0:1] | ascii_upcase) + .id[1:] + "All")})
-            ' .github/loaders.jsonl)
+          # `.github/metadata.json` names this repository's loaders.
+          if [[ ! -f .github/metadata.json ]]; then
+            echo "::error::no .github/metadata.json; nothing names the loaders"
+            exit 1
           fi
+          matrix=$(jq -c '
+            [.loaders[]
+              | {loader: .,
+                 task: ("test" + (.[0:1] | ascii_upcase) + .[1:] + "All")}]
+          ' .github/metadata.json)
           # An empty list is not a pass: `fromJSON([])` yields a matrix with no legs, so the job would
           # go green having run no suite at all.
           if [[ "$matrix" == "[]" ]]; then

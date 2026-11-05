@@ -1,0 +1,39 @@
+name: Build
+
+# For a repository that has no test harness yet: compile the jars and keep them, nothing else. The
+# shared matrix (`ci.yml`) is a contract about `checkModule`, `test<Loader>All` and a baseline tree,
+# so a consumer that satisfies none of it would fail every job; this type asks only for `./gradlew
+# build`, which every Gradle mod already has.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    # The dispatcher runs on issue and comment events too; a build belongs to a pull request or a push.
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read the JDK
+        id: jdk
+        run: |-
+          set -euo pipefail
+          if [[ ! -f .github/metadata.json ]]; then
+            echo "::error::no .github/metadata.json; it names the JDK this repository builds with"
+            exit 1
+          fi
+          echo "jdk=$(jq -r '.build.jdk // 17' .github/metadata.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK ${{ steps.jdk.outputs.jdk }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ steps.jdk.outputs.jdk }}
+
+      - name: Build
+        uses: kirjorjos/ci/minecraft-mods/types/build/run@minecraft-mods/v1

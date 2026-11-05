@@ -148,18 +148,13 @@ close_invalid() {
   exit 1
 }
 
-# `.loaders` from the metadata file; a version line still carrying the older `loaders.jsonl` keeps
-# working until it is migrated.
+# `.loaders` from the metadata file every version line carries. A failed read yields nothing, which
+# reads as "this side lists no loaders" and so announces no removal.
 read_loaders() {
-  local ref="$1" body
-  if body=$(gh api "repos/$REPO/contents/.github/metadata.json?ref=$ref" \
-    -H "Accept: application/vnd.github.raw" 2> /dev/null); then
-    jq -r '.loaders[]? // empty' <<<"$body" 2> /dev/null || true
-    return 0
-  fi
-  gh api "repos/$REPO/contents/.github/loaders.jsonl?ref=$ref" \
+  local ref="$1"
+  gh api "repos/$REPO/contents/.github/metadata.json?ref=$ref" \
     -H "Accept: application/vnd.github.raw" 2> /dev/null \
-    | jq -r '.id // empty' 2> /dev/null || true
+    | jq -r '.loaders[]? // empty' 2> /dev/null || true
 }
 
 # Removing a loader deletes its jobs, which is allowed but must never be silent (S18). One comment,

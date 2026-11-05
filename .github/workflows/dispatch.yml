@@ -66,6 +66,15 @@ jobs:
       contents: read
     uses: kirjorjos/ci/.github/workflows/type-lifecycle.yml@minecraft-mods/v1
 
+  # The type a repository with no test harness uses: compile its jars and upload them, nothing else.
+  build:
+    name: Build
+    needs: resolve
+    if: contains(fromJSON(needs.resolve.outputs.types), 'build')
+    permissions:
+      contents: read
+    uses: kirjorjos/ci/.github/workflows/type-build.yml@minecraft-mods/v1
+
   scripts:
     name: Scripts
     needs: resolve

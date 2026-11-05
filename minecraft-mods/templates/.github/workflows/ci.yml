@@ -43,24 +43,14 @@ jobs:
         id: read
         run: |
           set -euo pipefail
-          # One file per repository names its loaders: `.loaders` in `.github/metadata.json`. A
-          # version line that still carries the older `loaders.jsonl` keeps working until it is
-          # migrated; this fallback goes once every line has the metadata file.
-          if [[ -f .github/metadata.json ]]; then
-            file=.github/metadata.json
-            if ! ids="$(jq -c '.loaders' "$file" 2>/dev/null)"; then
-              echo "::error::$file is not valid JSON"
-              exit 1
-            fi
-          elif [[ -f .github/loaders.jsonl ]]; then
-            file=.github/loaders.jsonl
-            # JSON Lines: jq -s reads one object per line into one array of them.
-            if ! ids="$(jq -s -c '[.[] | .id]' "$file" 2>/dev/null)"; then
-              echo "::error::$file is not valid JSON Lines"
-              exit 1
-            fi
-          else
-            echo "::error::no .github/metadata.json or .github/loaders.jsonl"
+          # One file per repository names its loaders: `.loaders` in `.github/metadata.json`.
+          file=.github/metadata.json
+          if [[ ! -f "$file" ]]; then
+            echo "::error::$file is missing; it names this repository's loaders"
+            exit 1
+          fi
+          if ! ids="$(jq -c '.loaders' "$file" 2>/dev/null)"; then
+            echo "::error::$file is not valid JSON"
             exit 1
           fi
           if [[ "$ids" == "[]" ]]; then
@@ -87,12 +77,8 @@ jobs:
           # The two knobs a second version line or product needs: the JDK it builds with, and the
           # task that covers formatting plus the plugin's own tests. Both default to what this
           # matrix has always run, so a consumer that declares neither sees no change.
-          jdk=17
-          checktask=checkModule
-          if [[ "$file" == '.github/metadata.json' ]]; then
-            jdk="$(jq -r '.build.jdk // 17' "$file")"
-            checktask="$(jq -r '.build.checkTask // "checkModule"' "$file")"
-          fi
+          jdk="$(jq -r '.build.jdk // 17' "$file")"
+          checktask="$(jq -r '.build.checkTask // "checkModule"' "$file")"
           echo "jdk=$jdk" >> "$GITHUB_OUTPUT"
           echo "checktask=$checktask" >> "$GITHUB_OUTPUT"
           echo "Building with JDK $jdk, module check '$checktask'"

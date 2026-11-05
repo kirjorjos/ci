@@ -1,0 +1,43 @@
+name: Build
+description: >-
+  Runs one Gradle invocation for every loader and keeps what it produced. `CI` is already set by
+  Actions, which is what keeps a local-only `-dev-<n>` suffix out of the archive names.
+inputs:
+  task:
+    description: Gradle task to run
+    required: false
+    default: build
+  artifact-name:
+    description: Name of the uploaded artifact
+    required: false
+    default: jars
+runs:
+  using: composite
+  steps:
+    - name: Cache Gradle
+      uses: actions/cache@v4
+      with:
+        path: |-
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', 'gradle.properties', 'settings.gradle', 'settings.gradle.kts') }}
+        restore-keys: |-
+          ${{ runner.os }}-gradle-
+
+    - name: Build
+      shell: bash
+      env:
+        TASK: ${{ inputs.task }}
+      run: bash "${{ github.action_path }}/run.sh"
+
+    # `error`, not `warn`: a build that produced no jars is a broken build configuration, and an
+    # artifact job that goes green having uploaded nothing hides exactly that.
+    - name: Upload the jars
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: |-
+          build/libs/*.jar
+          */build/libs/*.jar
+        retention-days: 7
+        if-no-files-found: error
