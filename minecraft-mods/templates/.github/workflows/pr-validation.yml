@@ -63,7 +63,13 @@ jobs:
               --jq '[.check_runs[] | select(.name | endswith("Validate PR rules"))]' 2> /dev/null || echo '[]')
             [[ -n "$runs" ]] || runs='[]'
 
-            if jq -e 'any(.[]; .status == "completed" and .conclusion != "success")' <<<"$runs" > /dev/null; then
+            # A skipped check is not a verdict. The `pull_request` dispatch also reaches the Rules
+            # job on this SHA, and it skips there because that type is gated to
+            # `pull_request_target`; treating that skip as a failure failed the gate before the run
+            # that actually judges the PR finished. Only a real verdict counts.
+            if jq -e 'any(.[]; .status == "completed" and
+              (.conclusion == "failure" or .conclusion == "cancelled"
+               or .conclusion == "timed_out" or .conclusion == "action_required"))' <<<"$runs" > /dev/null; then
               echo "::error::the shared PR rules check did not pass; no suite runs for this PR"
               exit 1
             fi
