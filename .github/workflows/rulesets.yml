@@ -24,18 +24,27 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Rulesets are only visible to a token holding `administration: read`, and there is no
+      # narrower way to read them: the workflow's own token cannot, so a missing grant has to say so
+      # in one sentence rather than surface as a 422 from this action's stack trace.
       - name: Mint the app token
         id: app
+        continue-on-error: true
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          # Rulesets are read per consumer, which the sync installation already reaches for its
-          # writes; `administration: read` is the permission that also exposes them.
           permission-administration: read
 
+      - name: Explain a missing Administration permission
+        if: steps.app.outcome == 'failure'
+        run: |
+          echo "::error::The app installation does not grant Administration: read, so this job cannot read any ruleset. Grant it on the app's permissions page, then accept the updated installation request; the next scheduled run picks it up. No fallback exists - the workflow token cannot read rulesets at all."
+          exit 1
+
       - name: Compare every ruleset's required contexts against its workflows
+        if: steps.app.outcome == 'success'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: ruby scripts/rulesets.rb
