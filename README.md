@@ -25,7 +25,7 @@ is overwritten on each sync, so a consumer's copy is never the place to make a c
 |---|---|
 | `minecheck-ci.yml` | the entry workflow: calls `dispatch.yml`, which reads this repository's registry and runs the check types listed for that repository |
 | `minecheck-slot.yml` | when the per-version test-slot scheduler runs |
-| `pr-validation.yml` | a pull request's matrix: wait for the shared rules verdict, take this version line's slot, run `ci.yml` on the head, hand the slot back |
+| `pr-validation.yml` | a pull request's matrix: wait for the shared rules verdict, take this version line's slot, run `ci.yml` on the head, hand the slot back, and report the `Merge gate` check a ruleset requires |
 | `ci.yml` | the build matrix: plan, formatting plus plugin tests, one test job per loader, one aggregate verdict |
 | `pr-screenshot-comment.yml` | the mismatch table and its required check, once a validation run finishes |
 | `post-merge-screenshot-sync.yml` | the post-merge chore: write the merged run's captures into `tests/baselines/` and comment the source issue |
