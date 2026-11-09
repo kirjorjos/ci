@@ -190,6 +190,23 @@ wiring (a Gradle task, the coordinator, a driver file, another script, a docs pa
 catching a script that looks like coverage and runs nowhere. One comment, upserted by marker and
 deleted when the tree is clean, and the job never fails.
 
+### Ruleset contexts
+
+`Ruleset contexts` (scheduled, and dispatchable) closes the other way a gate goes quiet. It reads
+every consumer's rulesets and compares each `required_status_checks[].context` against the check
+names that repository's workflows can actually report, following a job's `uses:` into a reusable
+workflow so a caller's `<job> / <callee job>` counts as a provider. A matrix name is matched as a
+pattern, because the matrix expands it into one check per leg.
+
+It fails on a required context no job reports (naming the ruleset, the context and the workflows it
+searched), warns about a ruleset that is `disabled` since that gates nothing, and lists the contexts
+that are reported but required nowhere. A literal name is not what GitHub reports: the job's `name:`
+is, falling back to its id, which is why the check is about jobs rather than workflows.
+
+Reading another repository's rulesets needs `administration: read` on the app. `scripts/rulesets.rb`
+can also be run against a checkout and an exported ruleset list (`--workflows`, `--rulesets`), which
+is how the matching rules are exercised without a ruleset to break.
+
 ## Adding a type
 
 1. Add `<product>/types/<type>/<action>/action.yml` (composite; another product type must not be able

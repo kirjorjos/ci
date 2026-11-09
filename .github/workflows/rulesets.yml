@@ -1,0 +1,41 @@
+name: Ruleset contexts
+
+# A ruleset that requires a context no workflow reports looks exactly like a working gate in the API
+# and blocks every pull request once it is enforced, and a ruleset nobody enforces is not a gate at
+# all. Both are invisible from the pull request that would have caught them, so this runs on a
+# schedule instead: it compares every consumer's required contexts against the check names its
+# workflows can actually report.
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rulesets
+  cancel-in-progress: false
+
+jobs:
+  rulesets:
+    name: Ruleset contexts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Mint the app token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          # Rulesets are read per consumer, which the sync installation already reaches for its
+          # writes; `administration: read` is the permission that also exposes them.
+          permission-administration: read
+
+      - name: Compare every ruleset's required contexts against its workflows
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: ruby scripts/rulesets.rb
