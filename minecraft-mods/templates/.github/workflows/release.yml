@@ -724,9 +724,10 @@ jobs:
           REPO = os.environ["REPO"]
           MC = os.environ["MC"]
           VERSION = os.environ["VERSION"]
-          EDITED = "/tmp/edited.json"
+          RELEASED = "/tmp/released.json"
           MARK = f"closed in `{MC}` by PR #"
           FIXED = f"minecheck-fixed-in:{MC}"
+          STAMP = f"closed in release `{VERSION}`"
 
 
           def gh(*args):
@@ -738,42 +739,54 @@ jobs:
           issues = json.loads(
               gh("api", f"repos/{REPO}/issues?state=open&labels=versions/{MC}&per_page=100")
           )
-          edited = set()
-          if os.path.exists(EDITED):
-              with open(EDITED, encoding="utf-8") as handle:
-                  edited = {int(number) for number in json.load(handle)}
+          # One row per (issue, mc) this run released. The close step decides from the issue's
+          # whole `versions/*` label set, so releasing one line is not enough on its own.
+          released = []
+          if os.path.exists(RELEASED):
+              with open(RELEASED, encoding="utf-8") as handle:
+                  released = json.load(handle)
           for issue in issues:
               number = issue["number"]
               comments = json.loads(
                   gh("api", f"repos/{REPO}/issues/{number}/comments?per_page=100")
               )
+              found = False
               for comment in comments:
                   body = comment.get("body") or ""
                   # Two workflows record that work merged into <mc>: the post-merge chore writes
                   # "closed in `<mc>` by PR #n", and PR validation writes
                   # "<!-- minecheck-fixed-in:<mc> -->". Either is something a release can close
                   # from, so an issue whose chore comment failed is not stranded open.
-                  if (MARK not in body and FIXED not in body) or f"closed in release `{VERSION}`" in body:
+                  if MARK not in body and FIXED not in body:
                       continue
-                  updated = body + f"\n\nclosed in release `{VERSION}`"
+                  found = True
+                  if STAMP in body:
+                      continue
                   with open("/tmp/comment.json", "w", encoding="utf-8") as handle:
-                      json.dump({"body": updated}, handle)
+                      json.dump({"body": body + f"\n\n{STAMP}"}, handle)
                   gh(
                       "api", "-X", "PATCH",
                       f"repos/{REPO}/issues/comments/{comment['id']}",
                       "--input", "/tmp/comment.json",
                   )
-                  edited.add(number)
                   print(f"marked #{number} released in {VERSION}")
-          with open(EDITED, "w", encoding="utf-8") as handle:
-              json.dump(sorted(edited), handle)
+              if found:
+                  # Recorded even when the stamp was already there, so a re-run after a failed
+                  # close still closes what it released.
+                  released = [
+                      row for row in released
+                      if (row["number"], row["mc"]) != (number, MC)
+                  ]
+                  released.append({"number": number, "mc": MC, "version": VERSION})
+          with open(RELEASED, "w", encoding="utf-8") as handle:
+              json.dump(released, handle)
           PY
 
             echo "| $MC | $VERSION | $TAG | released |" >> "$GITHUB_STEP_SUMMARY"
             echo "::endgroup::"
           done
 
-      - name: Close the issues this release touched
+      - name: Close the issues every affected version has released
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -781,15 +794,80 @@ jobs:
           set -euo pipefail
           # Runs only after every version succeeded: the step above aborts otherwise, so an issue is
           # never closed for a release that did not finish.
-          [[ -f /tmp/edited.json ]] || { echo "No issue was marked released."; exit 0; }
-          mapfile -t NUMBERS < <(jq -r '.[]' /tmp/edited.json)
-          for number in "${NUMBERS[@]}"; do
-            [[ -n "$number" ]] || continue
-            jq -n --arg body "Closing: every affected Minecraft version this branch names has been released." \
-              '{body: $body}' | gh api "repos/$REPO/issues/$number/comments" --input - >/dev/null
-            gh api "repos/$REPO/issues/$number" -X PATCH -f state=closed >/dev/null
-            echo "closed #$number"
-          done
+          [[ -f /tmp/released.json ]] || { echo "No issue was marked released."; exit 0; }
+          REPO="$REPO" python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+
+          REPO = os.environ["REPO"]
+          RELEASED = "/tmp/released.json"
+          STAMP = "closed in release `"
+          VERSION_OF = re.compile(r"closed in release `([^`]+)`")
+
+
+          def gh(*args):
+              return subprocess.run(
+                  ["gh", *args], text=True, capture_output=True, check=True
+              ).stdout
+
+
+          with open(RELEASED, encoding="utf-8") as handle:
+              touched = sorted({int(row["number"]) for row in json.load(handle)})
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+
+          for number in touched:
+              issue = json.loads(gh("api", f"repos/{REPO}/issues/{number}"))
+              # Every version the issue claims, not just the line this run released.
+              labelled = sorted(
+                  {
+                      label["name"].split("/", 1)[1]
+                      for label in issue["labels"]
+                      if label["name"].startswith("versions/")
+                  }
+              )
+              bodies = [
+                  comment.get("body") or ""
+                  for comment in json.loads(
+                      gh("api", f"repos/{REPO}/issues/{number}/comments?per_page=100")
+                  )
+              ]
+              released = {}
+              pending = []
+              for mc in labelled:
+                  # A marker names one line, and its stamp is appended to the comment carrying it,
+                  # so "this line's marker sits in a stamped comment" means that fix has shipped.
+                  markers = (f"closed in `{mc}` by PR #", f"minecheck-fixed-in:{mc}")
+                  stamped = [
+                      body for body in bodies
+                      if any(marker in body for marker in markers) and STAMP in body
+                  ]
+                  if not stamped:
+                      pending.append(mc)
+                      continue
+                  versions = VERSION_OF.findall(stamped[-1])
+                  released[mc] = versions[-1] if versions else None
+              if pending:
+                  # Closing here would claim a version that has not shipped, and the merge that
+                  # fills the gap would then land on a closed issue nobody reads.
+                  print(f"#{number} stays open: {', '.join(pending)} not released")
+                  if summary:
+                      with open(summary, "a", encoding="utf-8") as handle:
+                          handle.write(f"| #{number} | left open | {', '.join(pending)} |\n")
+                  continue
+              detail = ", ".join(
+                  f"{mc} in `{version}`" if version else mc
+                  for mc, version in sorted(released.items())
+              )
+              body = "Closing: every affected Minecraft version has been released"
+              body += f" ({detail})." if detail else "."
+              with open("/tmp/comment.json", "w", encoding="utf-8") as handle:
+                  json.dump({"body": body}, handle)
+              gh("api", f"repos/{REPO}/issues/{number}/comments", "--input", "/tmp/comment.json")
+              gh("api", f"repos/{REPO}/issues/{number}", "-X", "PATCH", "-f", "state=closed")
+              print(f"closed #{number}")
+          PY
 
       # development is PR-only, so resetting the scratchpad needs a token that can bypass the
       # `Version development` ruleset: the CI App is the bypass actor. The reset lands on
