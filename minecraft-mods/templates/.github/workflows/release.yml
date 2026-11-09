@@ -500,6 +500,33 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Gradle needs a JVM it supports; the runner's default is whatever the image happens to ship
+      # (JDK 25 broke the 1.18.2/1.19.2 release on a Gradle 8.10 build). A line states its own JDK
+      # in `.github/metadata.json`, the same field `ci.yml` builds with, and one job can only set up
+      # one JDK before the loop - so the lines being released must agree, like `docs/lua-api.md`.
+      - name: Read the JDK
+        id: jdk
+        env:
+          PLAN: ${{ needs.prepare.outputs.plan }}
+        run: |
+          set -euo pipefail
+          git fetch --force --prune --tags origin '+refs/heads/*:refs/remotes/origin/*'
+          values="$(jq -r '.[].mc' <<<"$PLAN" | while read -r mc; do
+            git show "origin/$mc/main:.github/metadata.json" | jq -r '.build.jdk // 17'
+          done | sort -u)"
+          count="$(grep -c . <<<"$values" || true)"
+          if [[ "$count" != "1" ]]; then
+            echo "::error::the released lines do not name one JDK (found: $(tr '\n' ' ' <<<"$values")); refusing to build one release with several"
+            exit 1
+          fi
+          echo "jdk=$values" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK ${{ steps.jdk.outputs.jdk }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ steps.jdk.outputs.jdk }}
+
       - name: Configure git
         run: |
           set -euo pipefail
