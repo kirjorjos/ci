@@ -279,6 +279,53 @@ jobs:
           retention-days: 1
           if-no-files-found: ignore
 
+  # The jars a user installs, booted in instances a user installs them into. The lifecycle suites
+  # above run the *development* classpath, and `checkProductionJars` only inspects the jar, so a jar
+  # that breaks after remapping - or one whose metadata names an API nobody can satisfy - passed
+  # both and shipped. A product that ships no such check carries no `tests/boot-production-jars.py`,
+  # and this job then has nothing to do rather than failing a line for not having written one.
+  boot:
+    name: Boot the packaged jars
+    needs: plan
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.checkout_ref }}
+          allow-unsafe-pr-checkout: ${{ inputs.checkout_ref != '' }}
+
+      - name: Set up JDK ${{ needs.plan.outputs.jdk }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ needs.plan.outputs.jdk }}
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Boot every packaged loader jar
+        timeout-minutes: 45
+        run: |
+          set -euo pipefail
+          if [[ ! -f tests/boot-production-jars.py ]]; then
+            echo "This line ships no packaged-jar boot check; nothing to boot."
+            exit 0
+          fi
+          # The staged jars, not a dev run's classpath: collectArtifacts writes exactly the set a
+          # release attaches, and the script boots each loader's jar in an installed instance.
+          ./gradlew collectArtifacts --no-daemon --console=plain \
+            -Dorg.gradle.jvmargs="-Xmx2g -Dfile.encoding=UTF-8" \
+            -Dorg.gradle.worker.jvmargs="-Xmx2g"
+          python3 tests/boot-production-jars.py
+
   collect:
     name: Collect
     needs: test
@@ -323,15 +370,16 @@ jobs:
 
   tests:
     name: Tests
-    needs: [plan, module, test]
+    needs: [plan, module, test, boot]
     if: always()
     runs-on: ubuntu-22.04
     steps:
       - name: Require every loader and the module job
         run: |
           set -euo pipefail
-          echo "plan=${{ needs.plan.result }} module=${{ needs.module.result }} test=${{ needs.test.result }}"
+          echo "plan=${{ needs.plan.result }} module=${{ needs.module.result }} test=${{ needs.test.result }} boot=${{ needs.boot.result }}"
           [[ "${{ needs.plan.result }}" == "success" ]] || { echo "::error::the loader plan failed"; exit 1; }
           [[ "${{ needs.module.result }}" == "success" ]] || { echo "::error::formatting or the plugin tests failed"; exit 1; }
           [[ "${{ needs.test.result }}" == "success" ]] || { echo "::error::a loader failed"; exit 1; }
+          [[ "${{ needs.boot.result }}" == "success" ]] || { echo "::error::a packaged jar did not boot in an installed instance"; exit 1; }
           echo "Every loader passed."
