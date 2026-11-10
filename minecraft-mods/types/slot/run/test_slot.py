@@ -40,6 +40,13 @@ AGING_GRANTS = 3
 # Above the matrix's observed 30m34s worst case and the chore's 90-minute re-render timeout. A run
 # that dies without releasing is recovered by this expiring, never by its own cleanup.
 LEASE_MINUTES = 90
+# A grant is only meaningful while the run that took it is still alive. A run can end between `take`
+# and its `release` job - truncated, cancelled, or never scheduling the rest of its jobs - and then
+# nothing hands the slot back, so the lease holds the line with nobody on the other end. The waiter
+# is inside `take` seconds before the grant, so a run that is gone this much later is not coming
+# back. Seen on 2026-11-09: a post-merge run took 1.19.2's slot, ended 98 seconds later, and blocked
+# the line until 19:55.
+PICKUP_MINUTES = 5
 
 TIERS = {"chore": -1, "release": -1}
 FORK_TIER = 1
@@ -256,6 +263,18 @@ def pr_info(number: int | str) -> dict | None:
         return None
 
 
+def run_alive(sha: str) -> bool:
+    """Whether any workflow run for this commit is still queued or running."""
+    try:
+        runs = api(f"repos/{repo()}/actions/runs?head_sha={sha}&per_page=50").get("workflow_runs") or []
+    except (SlotError, json.JSONDecodeError) as error:
+        # A lookup that failed says nothing about the run, so it never reclaims on doubt.
+        warn(f"could not list the runs for {sha[:7]}: {error}")
+        return True
+    live = {"queued", "in_progress", "waiting", "pending", "requested"}
+    return any(run.get("status") in live for run in runs)
+
+
 def put_check(sha: str, status: str, conclusion: str | None, title: str, summary: str) -> None:
     """Best effort: a fork's head commit is not in this repository, so its check cannot attach."""
     if not sha:
@@ -290,12 +309,32 @@ def prune(state: dict, force: bool) -> bool:
     changed = False
     holder = state.get("holder")
     if holder:
-        expired = parse_iso(holder["lease_until"]) <= now()
+        lease_until = parse_iso(holder["lease_until"])
+        # A holder written before grants recorded their start is still judged: its lease began when
+        # the grant did.
+        granted = (
+            parse_iso(holder["granted_at"])
+            if holder.get("granted_at")
+            else lease_until - LEASE_MINUTES * 60
+        )
+        # A hold names no commit because no run takes it; only a granted run can be orphaned.
+        abandoned = (
+            bool(holder.get("sha"))
+            and now() - granted > PICKUP_MINUTES * 60
+            and not run_alive(holder["sha"])
+        )
         if force:
             log(f"force-clearing the holder ({holder.get('kind')})")
             changed = True
-        elif expired:
+        elif lease_until <= now():
             log(f"the holder's lease expired at {holder['lease_until']}")
+            changed = True
+        elif abandoned:
+            log(
+                f"the {holder.get('kind')} grant of {holder['sha'][:7]} is orphaned: no run of that "
+                f"commit is queued or running, so nothing will release it before "
+                f"{holder['lease_until']}"
+            )
             changed = True
         if changed:
             state["holder"] = None
@@ -358,6 +397,7 @@ def reconcile(mc: str, force: bool = False) -> None:
                     "kind": entry["kind"],
                     "pr": entry.get("pr", ""),
                     "sha": entry["sha"],
+                    "granted_at": iso(now()),
                     "lease_until": iso(now() + LEASE_MINUTES * 60),
                 }
                 if not entry.get("fork"):

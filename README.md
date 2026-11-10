@@ -142,7 +142,9 @@ an entry.
 Ordering is `(tier, seq)`: the post-merge chore and a release hold at `-1`, same-repo pull requests
 at `0`, forks at `1`. A fork is promoted after 45 minutes or three same-repo grants, so a busy day
 cannot starve it. A grant carries a 90-minute lease, and the synced scheduler reclaims a holder
-whose run died without releasing.
+whose run died without releasing — and, after five minutes, a grant with no queued or running run
+left behind it: a run can end between taking the grant and its `release` job, and the lease would
+then hold a line for nobody.
 
 A consumer wires two things:
 
