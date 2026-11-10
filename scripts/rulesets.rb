@@ -81,11 +81,14 @@ end
 
 # The same, from a checkout. Keys carry the `.github/workflows/` prefix so a `uses: ./...` path
 # resolves the same way it does in `repo_workflows`.
+#
+# `root` is empty when the directory named is exactly `.github/workflows` - the documented
+# `--workflows .github/workflows` - and `File.join("", key)` is `/key`, an absolute path that cannot
+# exist. So the two are joined only when there is a root to join them with.
 def dir_workflows(dir)
   root = dir.sub(%r{/?\.github/workflows/?\z}, "").chomp("/")
   keys = Dir.glob(File.join(dir, "**", "*.{yml,yaml}")).map { |p| p.delete_prefix("#{root}/") }
-  # A caller given as `--workflows .github/workflows` still names its files `./.github/workflows/x.yml`.
-  keys.to_h { |key| [key, File.read(File.join(root, key))] }
+  keys.to_h { |key| [key, File.read([root, key].reject(&:empty?).join("/"))] }
 end
 
 # Fetches a reusable workflow from another repository, or nil when it cannot be read.
