@@ -4,7 +4,8 @@ name: Ruleset contexts
 # and blocks every pull request once it is enforced, and a ruleset nobody enforces is not a gate at
 # all. Both are invisible from the pull request that would have caught them, so this runs on a
 # schedule instead: it compares every consumer's required contexts against the check names its
-# workflows can actually report.
+# workflows can actually report, and its Actions event policy against the workflows a pull request
+# starts - GitHub blocks `pull_request_target` in public repositories by default from 2026-12-02.
 on:
   schedule:
     - cron: "17 5 * * *"
@@ -25,8 +26,11 @@ jobs:
       - uses: actions/checkout@v5
 
       # Rulesets are only visible to a token holding `administration: read`, and there is no
-      # narrower way to read them: the workflow's own token cannot, so a missing grant has to say so
-      # in one sentence rather than surface as a 422 from this action's stack trace.
+      # narrower way to read them. Actions policies have no read-only form at all: their documented
+      # permission is `administration: write` even to list them. One token carries write for both,
+      # because an installation cannot be asked for more than it holds and asking for read would
+      # only move the 403 into the policy half. The workflow's own token can read neither, so a
+      # missing grant has to say so in one sentence rather than surface as a 422 from this action.
       - name: Mint the app token
         id: app
         continue-on-error: true
@@ -35,15 +39,15 @@ jobs:
           app-id: ${{ secrets.GH_APP_ID }}
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          permission-administration: read
+          permission-administration: write
 
       - name: Explain a missing Administration permission
         if: steps.app.outcome == 'failure'
         run: |
-          echo "::error::The app installation does not grant Administration: read, so this job cannot read any ruleset. Grant it on the app's permissions page, then accept the updated installation request; the next scheduled run picks it up. No fallback exists - the workflow token cannot read rulesets at all."
+          echo "::error::The app installation does not grant Administration: write, so this job cannot read any ruleset or Actions policy. Grant it on the app's permissions page, then accept the updated installation request; the next scheduled run picks it up. No fallback exists - the workflow token can read neither, and the policies API has no read-only permission."
           exit 1
 
-      - name: Compare every ruleset's required contexts against its workflows
+      - name: Compare every ruleset and event policy against its workflows
         if: steps.app.outcome == 'success'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
