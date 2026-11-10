@@ -205,9 +205,11 @@ searched), warns about a ruleset that is `disabled` since that gates nothing, an
 that are reported but required nowhere. A literal name is not what GitHub reports: the job's `name:`
 is, falling back to its id, which is why the check is about jobs rather than workflows.
 
-Reading another repository's rulesets needs `administration: read` on the app. `scripts/rulesets.rb`
-can also be run against a checkout and an exported ruleset list (`--workflows`, `--rulesets`), which
-is how the matching rules are exercised without a ruleset to break.
+Reading another repository's rulesets needs `administration: read` on the app, and its Actions event
+policies need `administration: write` - that endpoint has no read-only form - so `rulesets.yml` asks
+for write and one token carries both halves. `scripts/rulesets.rb` can also be run against a
+checkout and exported lists (`--workflows`, `--rulesets`, `--policies`), which is how the matching
+rules are exercised without a ruleset to break.
 
 ## Adding a type
 
