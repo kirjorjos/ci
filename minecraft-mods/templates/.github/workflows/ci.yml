@@ -282,8 +282,8 @@ jobs:
   # The jars a user installs, booted in instances a user installs them into. The lifecycle suites
   # above run the *development* classpath, and `checkProductionJars` only inspects the jar, so a jar
   # that breaks after remapping - or one whose metadata names an API nobody can satisfy - passed
-  # both and shipped. A product that ships no such check carries no `tests/boot-production-jars.py`,
-  # and this job then has nothing to do rather than failing a line for not having written one.
+  # both and shipped. A product with no `bootPackagedJars` task has nothing to boot, and this job
+  # then says so rather than failing a line for a check nobody wrote.
   boot:
     name: Boot the packaged jars
     needs: plan
@@ -315,16 +315,18 @@ jobs:
         timeout-minutes: 45
         run: |
           set -euo pipefail
-          if [[ ! -f tests/boot-production-jars.py ]]; then
+          # The check is a Gradle task, so the task's existence is the opt-in: a product that has
+          # not written one has nothing to boot rather than a failure for the check it never had.
+          if ! ./gradlew -q tasks --all --console=plain 2> /dev/null | grep -qw bootPackagedJars; then
             echo "This line ships no packaged-jar boot check; nothing to boot."
             exit 0
           fi
           # The staged jars, not a dev run's classpath: collectArtifacts writes exactly the set a
-          # release attaches, and the script boots each loader's jar in an installed instance.
-          ./gradlew collectArtifacts --no-daemon --console=plain \
+          # release attaches, and the task boots each loader's jar in an installed instance. It
+          # depends on collectArtifacts, so one invocation stages the jars and boots them.
+          ./gradlew bootPackagedJars --no-daemon --console=plain \
             -Dorg.gradle.jvmargs="-Xmx2g -Dfile.encoding=UTF-8" \
             -Dorg.gradle.worker.jvmargs="-Xmx2g"
-          python3 tests/boot-production-jars.py
 
   collect:
     name: Collect
