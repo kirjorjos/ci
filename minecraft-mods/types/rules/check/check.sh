@@ -116,9 +116,12 @@ fi
 # Marks the issue a merged development PR came from, so the release can find and later edit it. The
 # marker is what the release searches for; the prose is what a reader sees.
 record_fixed_in() {
-  local marker="minecheck-fixed-in:$TARGET_VERSION"
+  local marker="fixed-in:$TARGET_VERSION"
+  local legacy="minecheck-fixed-in:$TARGET_VERSION"
+  # `minecheck-fixed-in:` is what this wrote before the marker was product-neutral. An issue that
+  # already carries it must not collect a second comment for the same line.
   if gh api "repos/$REPO/issues/$SOURCE_ISSUE/comments" --paginate --jq '.[].body' \
-    | grep -F "$marker" > /dev/null; then
+    | grep -F -e "$marker" -e "$legacy" > /dev/null; then
     echo "Issue #$SOURCE_ISSUE already records $marker"
     return
   fi

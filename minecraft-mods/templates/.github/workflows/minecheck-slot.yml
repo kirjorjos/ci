@@ -34,7 +34,7 @@ concurrency:
 jobs:
   reconcile:
     name: Test slot
-    uses: kirjorjos/ci/.github/workflows/slot.yml@minecraft-mods/v1
+    uses: kirjorjos/ci/.github/workflows/slot.yml@minecraft-mods/v2
     permissions:
       contents: write
       checks: write
