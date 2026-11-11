@@ -25,8 +25,7 @@ is overwritten on each sync, so a consumer's copy is never the place to make a c
 |---|---|
 | `minecheck-ci.yml` | the entry workflow: calls `dispatch.yml`, which reads this repository's registry and runs the check types listed for that repository |
 | `minecheck-slot.yml` | when the per-version test-slot scheduler runs |
-| `pr-validation.yml` | a pull request's matrix: wait for the shared rules verdict, take this version line's slot, run `ci.yml` on the head, hand the slot back, and report the `Merge gate` check a ruleset requires |
-| `ci.yml` | the build matrix: plan, formatting plus plugin tests, one test job per loader, one aggregate verdict |
+| `pr-validation.yml` | a pull request's matrix: wait for the shared rules verdict, take this version line's slot, run the shared `matrix` type on the head, hand the slot back, and report the `Merge gate` check a ruleset requires |
 | `pr-screenshot-comment.yml` | the mismatch table and its required check, once a validation run finishes |
 | `post-merge-screenshot-sync.yml` | the post-merge chore: write the merged run's captures into `tests/baselines/` and comment the source issue |
 | `release.yml` | the release loop: bump, promote, tag, build, stage and publish one line at a time |
@@ -38,9 +37,9 @@ publish).
 
 A repository that appears in the registry but is not wired for a piece of this — no baselines, no
 slot, a different build — says so with `skip` rather than by keeping a divergent copy. MineCam takes
-the product's templates but skips the matrix and release workflows, so it gets the entry workflow
-and the slot scheduler and nothing that would try to run a suite or a release it has no
-configuration for.
+the product's templates but lists neither `matrix` nor `screenshots` and skips `release.yml`, so it
+gets the entry workflow with its `build` and `issues` checks, and nothing that would try to run a
+suite or a release it has no configuration for.
 
 One case is decided by the dispatcher rather than the entry file: a pull request whose base is a
 `<version>/main` line is a **promotion**, and it resolves to no types. Its tests already ran on the
@@ -70,9 +69,9 @@ file or from the layout the product already assumes.
 
 | Key | Read by | Meaning |
 |---|---|---|
-| `loaders` | `ci.yml` plan, `rules` | loader ids, `[a-z0-9][a-z0-9-]*`; one test job and one `tests/baselines/<id>/` tree each |
-| `build.jdk` | `ci.yml` | JDK the line builds with; default `17` |
-| `build.checkTask` | `ci.yml` | Gradle task covering formatting plus the plugin's own tests; default `checkModule` |
+| `loaders` | `matrix` plan, `rules` | loader ids, `[a-z0-9][a-z0-9-]*`; one test job and one `tests/baselines/<id>/` tree each |
+| `build.jdk` | `matrix` | JDK the line builds with; default `17` |
+| `build.checkTask` | `matrix` | Gradle task covering formatting plus the plugin's own tests; default `checkModule` |
 | `release` | the consumer's `release.yml`, `release-assets` | jar prefix, name format, variants (`-deobf`) and staging directory |
 
 Every key is optional apart from `loaders`, and each default reproduces what the workflow ran
@@ -97,10 +96,10 @@ be staged and which names belong to the tag: a line that ships one jar and a lin
   registry change rather than a workflow edit. Absent or empty means the release publishes nowhere,
   which the workflow refuses at the point it would tag.
 - `keep` — optional list of template paths this repository takes even though no type in `types`
-  implies them, given as the path under `templates/`. The one current use is a build matrix a line
-  has not moved to the `build` type yet: without the entry the file would simply stop reaching it.
+  implies them, given as the path under `templates/`. It restores a retired template, or takes one a
+  line wants without its type; no consumer needs it today.
 - `skip` — optional list of template paths this repository does not want, given as the path under
-  `templates/` (`.github/workflows/ci.yml`). Only the files no type implies have to be named here;
+  `templates/` (`.github/workflows/release.yml`). Only the files no type implies have to be named here;
   everything else follows from `types` and [`templates.jsonl`](#which-templates-a-consumer-gets).
 - `remove` — optional list of repository paths to delete from every version line on each sync. This
   is how a retired workflow leaves `*/main`: that branch takes no ordinary pull request, so the only
@@ -153,7 +152,7 @@ default branch would leave every older Minecraft line with no shared checks at a
 `matrix` is not dispatched either, for the opposite reason: it is the expensive half of a pull
 request, and it has to run inside a run that already holds that version line's test slot. A
 dispatched copy would be a second, unslotted writer on the same line — which is what the slot exists
-to prevent.
+to prevent. The caller is the type's template, so listing `matrix` in `types` brings both.
 
 `release-assets` is not dispatched: it asserts a staged release set, so it belongs in a release job,
 not on a PR. Call it directly:
