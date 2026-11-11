@@ -52,7 +52,9 @@ while IFS= read -r line; do
     failed=1
     continue
   fi
-  set=$(awk -F'\t' '$1 == "keep" {print $2}' <<<"$selection")
+  # Canonical order inside the line too: `find | sort` follows the caller's locale, and the golden
+  # file has to match the same path order on a laptop and on a runner.
+  set=$(awk -F'\t' '$1 == "keep" {print $2}' <<<"$selection" | LC_ALL=C sort)
   [[ -n "$set" ]] || set='(none)'
   { printf '%s' "$repo"; printf '\t%s' $set; printf '\n'; } >> "$computed"
 done < "$registry"
