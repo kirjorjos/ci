@@ -175,13 +175,17 @@ jobs:
 
 
           def active_chore(mc):
-              runs = json.loads(
-                  gh(
-                      "run", "list", "--repo", REPO, "--workflow", CHORE_WORKFLOW,
-                      "--branch", f"{mc}/development", "--limit", "20",
-                      "--json", "databaseId,status,conclusion,url",
-                  ).stdout
+              # A product without screenshots does not ship the chore at all, and `gh run list`
+              # fails on a workflow name the repository does not have. Nothing to wait for then.
+              result = gh(
+                  "run", "list", "--repo", REPO, "--workflow", CHORE_WORKFLOW,
+                  "--branch", f"{mc}/development", "--limit", "20",
+                  "--json", "databaseId,status,conclusion,url",
+                  check=False,
               )
+              if result.returncode != 0:
+                  return []
+              runs = json.loads(result.stdout)
               return [run for run in runs if run["status"] != "completed"]
 
 
@@ -373,6 +377,17 @@ jobs:
                   tag = f"{mc}/v{version}"
                   if tag_exists(tag):
                       errors.append(f"{tag}: tag already exists")
+                  # The API document the released lines have to agree on. A product without one
+                  # says so in its metadata (`release.docs: false`); the default leaves every other
+                  # consumer's requirement exactly as it was.
+                  meta = {}
+                  meta_text = remote_file(dev, ".github/metadata.json")
+                  if meta_text:
+                      try:
+                          meta = json.loads(meta_text)
+                      except ValueError:
+                          meta = {}
+                  docs_path = (meta.get("release") or {}).get("docs", "docs/lua-api.md")
                   rows.append(
                       {
                           "mc": mc,
@@ -381,7 +396,8 @@ jobs:
                           "version": version,
                           "notes": notes,
                           "main_exists": main_exists,
-                          "docs": blob_sha(dev, "docs/lua-api.md"),
+                          "docs": blob_sha(dev, docs_path) if docs_path else None,
+                          "docs_path": docs_path or "",
                           "commits": commits_since(mc),
                       }
                   )
@@ -399,11 +415,13 @@ jobs:
                   )
 
               documented = {row["mc"]: row["docs"] for row in planned if row["docs"]}
+              required_docs = {row["mc"]: row["docs_path"] for row in planned if row["docs_path"]}
+              docs_name = next(iter(required_docs.values()), "")
               if len(set(documented.values())) > 1:
                   detail = ", ".join(f"{mc}={sha[:8]}" for mc, sha in documented.items())
-                  errors.append(f"docs/lua-api.md differs across versions ({detail}); refusing to release")
-              elif not documented:
-                  errors.append("docs/lua-api.md is missing on the selected branches")
+                  errors.append(f"{docs_name} differs across versions ({detail}); refusing to release")
+              elif required_docs and not documented:
+                  errors.append(f"{docs_name} is missing on the selected branches")
 
               if errors:
                   for message in errors:
