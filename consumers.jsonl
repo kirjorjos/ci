@@ -1,3 +1,2 @@
 {"repo":"kirjorjos/Minecheck","product":"minecraft-mods","types":["screenshots","lifecycle","scripts","issues","rules","matrix"],"release":["gh"]}
-{"repo":"kirjorjos/MineCam","product":"minecraft-mods","types":["issues","build"],"release":["gh"],"skip":[".github/workflows/release.yml"]}
 {"repo":"kirjorjos/RegistryExtractor","product":"minecraft-mods","types":["issues","rules","build","lifecycle"],"release":["gh"]}

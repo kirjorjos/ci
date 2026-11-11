@@ -5,8 +5,8 @@
 # repository, and it usually happens sideways: a file added under `minecraft-mods/templates/` joins
 # every consumer whose types it shares, a type added to or dropped from a registry entry moves a
 # whole group, an emptied type list retires a file nobody meant to retire. None of that is
-# in the diff that causes it, and the sync then writes it into every version line of three
-# repositories. This compares each consumer's installed set against `tests/template-sets.tsv` and
+# in the diff that causes it, and the sync then writes it into every version line of every registered
+# repository. This compares each consumer's installed set against `tests/template-sets.tsv` and
 # fails on any difference, so the change has to be written down and reviewed.
 #
 #   bash tests/template-sets.sh            compare
