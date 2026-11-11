@@ -67,7 +67,7 @@ jobs:
           sudo apt-get install -y xvfb
 
       - name: Run the suite
-        uses: kirjorjos/ci/minecraft-mods/types/lifecycle/run@minecraft-mods/v1
+        uses: kirjorjos/ci/minecraft-mods/types/lifecycle/run@minecraft-mods/v3
         with:
           loader: ${{ matrix.loader }}
           task: ${{ matrix.task }}

@@ -70,7 +70,7 @@ jobs:
           sudo apt-get install -y xvfb
 
       - name: Capture
-        uses: kirjorjos/ci/minecraft-mods/types/screenshots/run@minecraft-mods/v1
+        uses: kirjorjos/ci/minecraft-mods/types/screenshots/run@minecraft-mods/v3
         with:
           task: ${{ matrix.task }}
           # The gradle run directory is per-module, not at the repository root.
@@ -78,7 +78,7 @@ jobs:
 
       - name: Diff against baselines
         id: diff
-        uses: kirjorjos/ci/minecraft-mods/types/screenshots/diff@minecraft-mods/v1
+        uses: kirjorjos/ci/minecraft-mods/types/screenshots/diff@minecraft-mods/v3
         with:
           loader: ${{ matrix.loader }}
           captures-dir: src/${{ matrix.loader }}/mod/run/client/screenshots
@@ -94,7 +94,7 @@ jobs:
 
       - name: Report mismatches
         if: steps.diff.outputs.has-mismatches == 'true' && github.event_name == 'pull_request'
-        uses: kirjorjos/ci/minecraft-mods/types/screenshots/comment@minecraft-mods/v1
+        uses: kirjorjos/ci/minecraft-mods/types/screenshots/comment@minecraft-mods/v3
         with:
           pr-number: ${{ github.event.pull_request.number }}
           list-file: ${{ steps.diff.outputs.list-file }}

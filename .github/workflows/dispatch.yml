@@ -56,7 +56,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: kirjorjos/ci/.github/workflows/type-screenshots.yml@minecraft-mods/v1
+    uses: kirjorjos/ci/.github/workflows/type-screenshots.yml@minecraft-mods/v3
 
   lifecycle:
     name: Lifecycle
@@ -64,7 +64,7 @@ jobs:
     if: contains(fromJSON(needs.resolve.outputs.types), 'lifecycle')
     permissions:
       contents: read
-    uses: kirjorjos/ci/.github/workflows/type-lifecycle.yml@minecraft-mods/v1
+    uses: kirjorjos/ci/.github/workflows/type-lifecycle.yml@minecraft-mods/v3
 
   # The type a repository with no test harness uses: compile its jars and upload them, nothing else.
   build:
@@ -73,7 +73,7 @@ jobs:
     if: contains(fromJSON(needs.resolve.outputs.types), 'build')
     permissions:
       contents: read
-    uses: kirjorjos/ci/.github/workflows/type-build.yml@minecraft-mods/v1
+    uses: kirjorjos/ci/.github/workflows/type-build.yml@minecraft-mods/v3
 
   scripts:
     name: Scripts
@@ -82,7 +82,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    uses: kirjorjos/ci/.github/workflows/type-scripts.yml@minecraft-mods/v1
+    uses: kirjorjos/ci/.github/workflows/type-scripts.yml@minecraft-mods/v3
 
   issues:
     name: Issues
@@ -91,7 +91,7 @@ jobs:
     permissions:
       contents: read
       issues: write
-    uses: kirjorjos/ci/.github/workflows/type-issues.yml@minecraft-mods/v1
+    uses: kirjorjos/ci/.github/workflows/type-issues.yml@minecraft-mods/v3
 
   # The one type that runs on `pull_request_target` rather than `pull_request`: it comments on and
   # closes pull requests, which a fork's read-only token cannot do. It never checks the PR out.
@@ -103,4 +103,4 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-    uses: kirjorjos/ci/.github/workflows/type-rules.yml@minecraft-mods/v1
+    uses: kirjorjos/ci/.github/workflows/type-rules.yml@minecraft-mods/v3
