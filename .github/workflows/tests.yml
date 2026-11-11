@@ -1,0 +1,29 @@
+name: Repo checks
+
+# The registry decides what runs inside three other repositories, so a template reaching a consumer
+# for the first time - or quitting one - is a change worth blocking on until it is recorded. This
+# runs the test that pins those sets. Pull requests get it, and main keeps it green after merges that
+# land without one.
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  template-sets:
+    name: Template sets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Compare every consumer's installed templates with the recorded set
+        run: bash tests/template-sets.sh

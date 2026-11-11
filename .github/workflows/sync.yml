@@ -11,7 +11,7 @@ on:
     paths:
       - "minecraft-mods/**"
       - "consumers.jsonl"
-      - "scripts/sync.sh"
+      - "scripts/**"
       - ".github/workflows/sync.yml"
   workflow_dispatch:
 
