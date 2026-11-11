@@ -55,7 +55,7 @@ jobs:
           script: |
             const fs = require("node:fs");
             const run = context.payload.workflow_run;
-            // A loader id is what `ci.yml` already accepts: lowercase, digits and dashes. The
+            // A loader id is what the matrix already accepts: lowercase, digits and dashes. The
             // manifest arrives from the pull request's own artifacts, so the path is checked rather
             // than trusted - it decides which baseline tree the post-merge chore later rewrites.
             const baseline = /^tests\/baselines\/[a-z0-9][a-z0-9-]*\/[^/]+\.png$/;

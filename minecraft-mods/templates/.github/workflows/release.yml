@@ -520,7 +520,7 @@ jobs:
 
       # Gradle needs a JVM it supports; the runner's default is whatever the image happens to ship
       # (JDK 25 broke the 1.18.2/1.19.2 release on a Gradle 8.10 build). A line states its own JDK
-      # in `.github/metadata.json`, the same field `ci.yml` builds with, and one job can only set up
+      # in `.github/metadata.json`, the same field the matrix builds with, and one job can only set up
       # one JDK before the loop - so the lines being released must agree, like `docs/lua-api.md`.
       - name: Read the JDK
         id: jdk
