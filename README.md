@@ -96,13 +96,32 @@ be staged and which names belong to the tag: a line that ships one jar and a lin
   `modrinth` when those are wired. A target the array omits runs nothing, so adding one is a
   registry change rather than a workflow edit. Absent or empty means the release publishes nowhere,
   which the workflow refuses at the point it would tag.
+- `keep` — optional list of template paths this repository takes even though no type in `types`
+  implies them, given as the path under `templates/`. The one current use is a build matrix a line
+  has not moved to the `build` type yet: without the entry the file would simply stop reaching it.
 - `skip` — optional list of template paths this repository does not want, given as the path under
-  `templates/` (`.github/workflows/ci.yml`). Used by a consumer that takes the product's entry
-  workflow but has no matrix of its own to run.
+  `templates/` (`.github/workflows/ci.yml`). Only the files no type implies have to be named here;
+  everything else follows from `types` and [`templates.jsonl`](#which-templates-a-consumer-gets).
 - `remove` — optional list of repository paths to delete from every version line on each sync. This
   is how a retired workflow leaves `*/main`: that branch takes no ordinary pull request, so the only
   thing that can take a file away from it is a write carrying the app's bypass. Absent is the steady
   state, so a second sync deletes nothing.
+
+### Which templates a consumer gets
+
+`<product>/templates.jsonl` says which check type owns a template, one object per line:
+
+```jsonl
+{"path":".github/workflows/post-merge-screenshot-sync.yml","types":["screenshots"]}
+```
+
+- Absent from the file — the template belongs to no type and ships to every consumer.
+- `"types": ["screenshots"]` — ships only to a consumer whose `types` include `screenshots`.
+- `"types": []` — retired: no type implies it, so only a `keep` entry brings it back.
+
+`skip` still wins over all three, so a repository can refuse a file that one of its types would
+otherwise bring. The point is that a consumer no longer has to enumerate the templates of the types
+it omits, which is where a stale `skip` entry used to come from.
 
 The sync targets **every version line** — each `<version>/main` and `<version>/development`, plus
 the repository's default branch. A workflow file only triggers on a branch that carries it (a push
