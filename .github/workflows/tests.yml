@@ -30,3 +30,6 @@ jobs:
 
       - name: Exercise the sync's write loop against a stub gh
         run: bash tests/sync-loop.sh
+
+      - name: Match every reported check name a ruleset can require
+        run: bash tests/ruleset-contexts.sh
