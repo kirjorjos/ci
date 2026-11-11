@@ -240,9 +240,11 @@ def contexts_of(jobs, workflows, prefix, depth, unresolved, fetcher)
   end
 end
 
-# `${{ ... }}` matches whatever the matrix expanded it to; everything else is literal.
+# `${{ ... }}` matches whatever the matrix expanded it to; everything else is literal. The split
+# keeps its trailing empty field, because a name that ends in a matrix expression - `Lifecycle /
+# ${{ matrix.loader }}` - is exactly the one whose wildcard has to reach the end of the context.
 def matches?(pattern, context)
-  parts = pattern.split(MATRIX).map { |part| Regexp.escape(part) }
+  parts = pattern.split(MATRIX, -1).map { |part| Regexp.escape(part) }
   Regexp.new("\\A#{parts.join('.*')}\\z").match?(context)
 end
 
