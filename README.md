@@ -36,10 +36,11 @@ jar prefix, the variants a line ships, the staging directory) or the registry (w
 publish).
 
 A repository that appears in the registry but is not wired for a piece of this — no baselines, no
-slot, a different build — says so with `skip` rather than by keeping a divergent copy. MineCam takes
-the product's templates but lists neither `matrix` nor `screenshots` and skips `release.yml`, so it
-gets the entry workflow with its `build` and `issues` checks, and nothing that would try to run a
-suite or a release it has no configuration for.
+slot, a different build — says so with `skip` rather than by keeping a divergent copy, and its type
+list decides the rest. No consumer needs either today: Minecheck takes the whole product, and
+RegistryExtractor lists `issues`, `rules`, `build` and `lifecycle` and gets exactly those entry
+points. MineCam was the `skip` case until it was retired — its camera now ships inside Minecheck —
+so it is no longer a consumer at all.
 
 One case is decided by the dispatcher rather than the entry file: a pull request whose base is a
 `<version>/main` line is a **promotion**, and it resolves to no types. Its tests already ran on the
