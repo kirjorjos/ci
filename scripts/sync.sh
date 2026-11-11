@@ -13,6 +13,10 @@
 # therefore checked by hand, so a rejected write fails the run instead of being reported as a success.
 set -uo pipefail
 
+# The per-template decision this script applies; tests/template-sets.sh runs the same function,
+# so the test pins the sets the sync would actually write.
+source "$(dirname "${BASH_SOURCE[0]}")/template-set.sh"
+
 : "${GH_TOKEN:?}" "${SOURCE_SHA:?}"
 registry="${1:-consumers.jsonl}"
 [[ -f "$registry" ]] || {
@@ -47,8 +51,8 @@ version_lines() {
 
 sync_repo() {
   local repo="$1" product="$2" skip="$3" wants_labels="$4" prune="$5" types="$6" keep="$7"
-  local branch base_sha base_tree entries changed=0 file rel blob current payload tree commit ref i
-  local line name ok owners template_types='{}'
+  local branch base_sha base_tree entries changed=0 rel blob current payload tree commit ref i
+  local line name ok verdict reason template_types='{}'
   local -a branches=() paths=() blobs=()
 
   mapfile -t branches < <(version_lines "$repo")
@@ -69,38 +73,15 @@ sync_repo() {
     fi
   fi
 
-  # One blob per template file, reused by every branch: the bytes do not depend on the branch.
-  while IFS= read -r file; do
-    rel="${file#"$product"/templates/}"
-    if jq -e --arg path "$rel" 'index($path) != null' <<<"$skip" > /dev/null; then
-      echo "skipping $rel (registry)"
+  # One blob per installed template, reused by every branch: the bytes do not depend on the branch.
+  while IFS=$'\t' read -r verdict rel reason; do
+    if [[ "$verdict" != keep ]]; then
+      echo "skipping $rel ($reason)"
       continue
     fi
 
-    owners=$(jq -r --arg rel "$rel" \
-      'if has($rel) then (.[$rel] | if length == 0 then "legacy" else join(" ") end) else "any" end' \
-      <<<"$template_types")
-    case "$owners" in
-      any)
-        :
-        ;;
-      legacy)
-        if ! jq -e --arg path "$rel" 'index($path) != null' <<<"$keep" > /dev/null; then
-          echo "skipping $rel (retired template; name it in keep to restore)"
-          continue
-        fi
-        ;;
-      *)
-        if ! jq -e --arg owners "$owners" --argjson have "$types" \
-          '$owners | split(" ") | any(. as $want | $have | index($want))' > /dev/null; then
-          echo "skipping $rel (no ${owners// / or } type)"
-          continue
-        fi
-        ;;
-    esac
-
     payload=$(mktemp)
-    jq -n --rawfile content "$file" '{content: $content, encoding: "utf-8"}' > "$payload"
+    jq -n --rawfile content "$product/templates/$rel" '{content: $content, encoding: "utf-8"}' > "$payload"
     if ! blob=$(api "creating a blob for $rel" -X POST "repos/$repo/git/blobs" --input "$payload" --jq .sha); then
       rm -f "$payload"
       return 1
@@ -109,7 +90,7 @@ sync_repo() {
 
     paths+=("$rel")
     blobs+=("$blob")
-  done < <(find "$product/templates" -type f | sort)
+  done < <(template_selection "$template_types" "$product/templates" "$skip" "$keep" "$types")
 
   for branch in "${branches[@]}"; do
     base_sha=$(api "reading the tip of $branch" "repos/$repo/git/ref/heads/$branch" --jq .object.sha) || return 1

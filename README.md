@@ -123,6 +123,11 @@ be staged and which names belong to the tag: a line that ships one jar and a lin
 otherwise bring. The point is that a consumer no longer has to enumerate the templates of the types
 it omits, which is where a stale `skip` entry used to come from.
 
+`tests/template-sets.sh` pins the resulting set for every consumer against
+`tests/template-sets.tsv`. A template that starts or stops reaching a repository has to be recorded
+there - `bash tests/template-sets.sh --update` - and reviewed with the change that caused it; the
+test fails otherwise, and it runs on every pull request.
+
 The sync targets **every version line** — each `<version>/main` and `<version>/development`, plus
 the repository's default branch. A workflow file only triggers on a branch that carries it (a push
 runs the file on the pushed branch, a pull request runs its base branch's copy), so writing only the
