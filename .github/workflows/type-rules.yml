@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Judge the shape and act on it
-        uses: kirjorjos/ci/minecraft-mods/types/rules/check@minecraft-mods/v1
+        uses: kirjorjos/ci/minecraft-mods/types/rules/check@minecraft-mods/v3
         env:
           GH_TOKEN: ${{ github.token }}
         with:

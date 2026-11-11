@@ -71,7 +71,7 @@ jobs:
 
       - name: Wait for the grant
         if: steps.guard.outputs.skip == 'false'
-        uses: kirjorjos/ci/minecraft-mods/types/slot/run@minecraft-mods/v2
+        uses: kirjorjos/ci/minecraft-mods/types/slot/run@minecraft-mods/v3
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         with:
@@ -367,7 +367,7 @@ jobs:
           token: ${{ steps.app.outputs.token }}
 
       - name: Give the slot back
-        uses: kirjorjos/ci/minecraft-mods/types/slot/run@minecraft-mods/v2
+        uses: kirjorjos/ci/minecraft-mods/types/slot/run@minecraft-mods/v3
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         with:

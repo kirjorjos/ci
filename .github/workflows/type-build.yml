@@ -49,4 +49,4 @@ jobs:
           java-version: ${{ steps.jdk.outputs.versions }}
 
       - name: Build
-        uses: kirjorjos/ci/minecraft-mods/types/build/run@minecraft-mods/v1
+        uses: kirjorjos/ci/minecraft-mods/types/build/run@minecraft-mods/v3

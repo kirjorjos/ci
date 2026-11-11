@@ -121,7 +121,7 @@ jobs:
 
       - name: Take a place in the queue and wait for the grant
         id: take
-        uses: kirjorjos/ci/minecraft-mods/types/slot/run@minecraft-mods/v2
+        uses: kirjorjos/ci/minecraft-mods/types/slot/run@minecraft-mods/v3
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         with:
@@ -166,7 +166,7 @@ jobs:
           token: ${{ steps.app.outputs.token }}
 
       - name: Give the slot back
-        uses: kirjorjos/ci/minecraft-mods/types/slot/run@minecraft-mods/v2
+        uses: kirjorjos/ci/minecraft-mods/types/slot/run@minecraft-mods/v3
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         with:

@@ -41,7 +41,7 @@ jobs:
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
 
       - name: Reconcile
-        uses: kirjorjos/ci/minecraft-mods/types/slot/run@minecraft-mods/v1
+        uses: kirjorjos/ci/minecraft-mods/types/slot/run@minecraft-mods/v3
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         with:

@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Audit the script tree
-        uses: kirjorjos/ci/minecraft-mods/types/scripts/audit@minecraft-mods/v1
+        uses: kirjorjos/ci/minecraft-mods/types/scripts/audit@minecraft-mods/v3
         env:
           GH_TOKEN: ${{ github.token }}
         with:

@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check the affected-version field
-        uses: kirjorjos/ci/minecraft-mods/types/issues/version-check@minecraft-mods/v1
+        uses: kirjorjos/ci/minecraft-mods/types/issues/version-check@minecraft-mods/v3
         env:
           GH_TOKEN: ${{ github.token }}
         with:
@@ -37,7 +37,7 @@ jobs:
       - name: Apply the versions the comment confirms
         # `pull_request` is present on an issue that is a pull request; those are not issues.
         if: github.event.issue.pull_request == null
-        uses: kirjorjos/ci/minecraft-mods/types/issues/confirm-version@minecraft-mods/v1
+        uses: kirjorjos/ci/minecraft-mods/types/issues/confirm-version@minecraft-mods/v3
         env:
           GH_TOKEN: ${{ github.token }}
         with:
