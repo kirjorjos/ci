@@ -46,15 +46,27 @@ version_lines() {
 }
 
 sync_repo() {
-  local repo="$1" product="$2" skip="$3" wants_labels="$4" prune="$5"
+  local repo="$1" product="$2" skip="$3" wants_labels="$4" prune="$5" types="$6" keep="$7"
   local branch base_sha base_tree entries changed=0 file rel blob current payload tree commit ref i
-  local line name ok
+  local line name ok owners template_types='{}'
   local -a branches=() paths=() blobs=()
 
   mapfile -t branches < <(version_lines "$repo")
   if (( ${#branches[@]} == 0 )); then
     echo "::error::$repo: no version line (no default branch?) to sync"
     return 1
+  fi
+
+  # Which check type a template belongs to (`$product/templates.jsonl`). A file the table does not
+  # name ships everywhere; `[]` marks a retired template only an explicit `keep` brings back; any
+  # other list ships it to the consumers whose types intersect it. That is what lets a consumer's
+  # `skip` shrink: it no longer has to enumerate every template of a type it does not take.
+  if [[ -f "$product/templates.jsonl" ]]; then
+    if ! template_types=$(jq -s 'map({key: .path, value: .types}) | from_entries' \
+      "$product/templates.jsonl"); then
+      echo "::error::$product/templates.jsonl is not a list of {path, types} objects"
+      return 1
+    fi
   fi
 
   # One blob per template file, reused by every branch: the bytes do not depend on the branch.
@@ -64,6 +76,28 @@ sync_repo() {
       echo "skipping $rel (registry)"
       continue
     fi
+
+    owners=$(jq -r --arg rel "$rel" \
+      'if has($rel) then (.[$rel] | if length == 0 then "legacy" else join(" ") end) else "any" end' \
+      <<<"$template_types")
+    case "$owners" in
+      any)
+        :
+        ;;
+      legacy)
+        if ! jq -e --arg path "$rel" 'index($path) != null' <<<"$keep" > /dev/null; then
+          echo "skipping $rel (retired template; name it in keep to restore)"
+          continue
+        fi
+        ;;
+      *)
+        if ! jq -e --arg owners "$owners" --argjson have "$types" \
+          '$owners | split(" ") | any(. as $want | $have | index($want))' > /dev/null; then
+          echo "skipping $rel (no ${owners// / or } type)"
+          continue
+        fi
+        ;;
+    esac
 
     payload=$(mktemp)
     jq -n --rawfile content "$file" '{content: $content, encoding: "utf-8"}' > "$payload"
@@ -202,7 +236,7 @@ while IFS= read -r line; do
   fi
 
   echo "::group::$repo ($product)"
-  if ! sync_repo "$repo" "$product" "$(jq -c '.skip // []' <<<"$line")" "$(jq -r '.labels // true' <<<"$line")" "$(jq -c '.remove // []' <<<"$line")"; then
+  if ! sync_repo "$repo" "$product" "$(jq -c '.skip // []' <<<"$line")" "$(jq -r '.labels // true' <<<"$line")" "$(jq -c '.remove // []' <<<"$line")" "$(jq -c '.types // []' <<<"$line")" "$(jq -c '.keep // []' <<<"$line")"; then
     echo "::error::$repo did not finish syncing"
     failed=1
   fi

@@ -1,0 +1,5 @@
+{"path":".github/workflows/ci.yml","types":[]}
+{"path":".github/workflows/pr-validation.yml","types":[]}
+{"path":".github/workflows/minecheck-slot.yml","types":["screenshots"]}
+{"path":".github/workflows/pr-screenshot-comment.yml","types":["screenshots"]}
+{"path":".github/workflows/post-merge-screenshot-sync.yml","types":["screenshots"]}
