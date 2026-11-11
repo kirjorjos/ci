@@ -4,7 +4,7 @@
 # A template that starts or stops reaching a consumer is a real change to what runs in another
 # repository, and it usually happens sideways: a file added under `minecraft-mods/templates/` joins
 # every consumer whose types it shares, a type added to or dropped from a registry entry moves a
-# whole group, a `keep` entry removed retires a file nobody meant to retire. None of that is visible
+# whole group, an emptied type list retires a file nobody meant to retire. None of that is
 # in the diff that causes it, and the sync then writes it into every version line of three
 # repositories. This compares each consumer's installed set against `tests/template-sets.tsv` and
 # fails on any difference, so the change has to be written down and reviewed.
@@ -44,10 +44,9 @@ while IFS= read -r line; do
     continue
   fi
   skip=$(jq -c '.skip // []' <<<"$line")
-  keep=$(jq -c '.keep // []' <<<"$line")
   types=$(jq -c '.types // []' <<<"$line")
 
-  if ! selection=$(template_selection "$table" "$templates" "$skip" "$keep" "$types"); then
+  if ! selection=$(template_selection "$table" "$templates" "$skip" "$types"); then
     echo "::error::$repo: selecting templates failed"
     failed=1
     continue

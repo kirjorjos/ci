@@ -6,15 +6,14 @@
 #   drop<TAB><rel><TAB><why>
 #
 # <table> is `<product>/templates.jsonl` reduced to {path: types}: a path the table does not name
-# ships everywhere; `[]` is a retired template only an explicit `keep` in the registry brings back;
-# any other list ships it where the consumer's `types` intersect it. `skip` is the registry's
-# explicit refusal and wins over all of that.
+# ships everywhere; any other list ships it where the consumer's `types` intersect it, so an empty
+# list ships nowhere. `skip` is the registry's explicit refusal and wins over all of that.
 #
 # It lives beside sync.sh rather than inside it so the test runs this code instead of a second copy
 # of the same rules, which would only ever agree with itself.
 
 template_selection() {
-  local table="$1" dir="$2" skip="$3" keep="$4" types="$5"
+  local table="$1" dir="$2" skip="$3" types="$4"
   local file rel owners
   while IFS= read -r file; do
     rel="${file#"$dir"/}"
@@ -24,16 +23,13 @@ template_selection() {
     fi
 
     owners=$(jq -r --arg rel "$rel" \
-      'if has($rel) then (.[$rel] | if length == 0 then "legacy" else join(" ") end) else "any" end' \
-      <<<"$table") || return 1
+      'if has($rel) then (.[$rel] | join(" ")) else "any" end' <<<"$table") || return 1
     case "$owners" in
       any)
         ;;
-      legacy)
-        if ! jq -e --arg path "$rel" 'index($path) != null' <<<"$keep" > /dev/null; then
-          printf 'drop\t%s\t%s\n' "$rel" 'retired template; name it in keep to restore'
-          continue
-        fi
+      "")
+        printf 'drop\t%s\t%s\n' "$rel" 'no type implies it'
+        continue
         ;;
       *)
         if ! jq -n -e --arg owners "$owners" --argjson have "$types" \
