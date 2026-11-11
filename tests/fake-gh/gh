@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""A stand-in for `gh` that answers from a fixture directory and records every call.
+
+Only what scripts/sync.sh asks for exists here: the repository, its branches, tree and commit
+objects, contents lookups, and labels. Responses are shaped like the REST API's, and `--jq` is
+honoured the way `gh` honours it, because the script filters with it.
+
+Environment:
+  FAKE_GH_DIR         fixture root; `branches/<branch>/<path>` holds what each branch already has,
+                      `log.jsonl` is appended to for every write
+  FAKE_DEFAULT_BRANCH the repository's default branch
+"""
+
+import hashlib
+import json
+import os
+import pathlib
+import re
+import subprocess
+import sys
+
+state = pathlib.Path(os.environ["FAKE_GH_DIR"])
+log_file = state / "log.jsonl"
+
+argv = sys.argv[1:]
+if not argv:
+    sys.exit("fake gh: no arguments")
+mode = argv.pop(0)
+
+
+def emit(obj, jq=None):
+    text = json.dumps(obj)
+    if jq is None:
+        sys.stdout.write(text)
+        return
+    done = subprocess.run(["jq", "-r", jq], input=text, text=True, capture_output=True)
+    if done.returncode != 0:
+        sys.stderr.write(done.stderr)
+        sys.exit(1)
+    sys.stdout.write(done.stdout)
+
+
+def record(entry):
+    with log_file.open("a") as f:
+        f.write(json.dumps(entry) + "\n")
+
+
+def blob_sha(data: bytes) -> str:
+    return hashlib.sha1(b"blob %d\x00" % len(data) + data).hexdigest()
+
+
+if mode == "label":
+    record({"op": "label", "argv": argv})
+    sys.exit(0)
+
+if mode != "api":
+    sys.exit(f"fake gh: unsupported command {mode!r}")
+
+method = "GET"
+jq = None
+path = None
+body = None
+fields = {}
+i = 0
+while i < len(argv):
+    arg = argv[i]
+    if arg == "--jq":
+        jq = argv[i + 1]
+        i += 2
+    elif arg in ("-X", "--method"):
+        method = argv[i + 1].upper()
+        i += 2
+    elif arg == "--input":
+        body = json.loads(pathlib.Path(argv[i + 1]).read_text())
+        i += 2
+    elif arg == "-f":
+        key, _, value = argv[i + 1].partition("=")
+        fields[key] = value
+        i += 2
+    elif arg == "--paginate" or arg.startswith("-"):
+        i += 1
+    else:
+        if path is None:
+            path = arg
+        i += 1
+
+if path is None:
+    sys.exit("fake gh: no API path")
+
+if method == "POST" and path.endswith("/git/blobs"):
+    content = body["content"].encode()
+    sha = blob_sha(content)
+    record({"op": "blob", "sha": sha})
+    emit({"sha": sha}, jq)
+    sys.exit(0)
+
+if method == "POST" and path.endswith("/git/trees"):
+    record({"op": "tree", "body": body})
+    emit({"sha": "tree-new"}, jq)
+    sys.exit(0)
+
+if method == "POST" and path.endswith("/git/commits"):
+    record({"op": "commit", "body": body})
+    emit({"sha": "commit-new"}, jq)
+    sys.exit(0)
+
+if method == "PATCH" and "/git/refs/heads/" in path:
+    branch = path.split("/git/refs/heads/", 1)[1]
+    record({"op": "ref", "branch": branch, "sha": fields.get("sha")})
+    emit({"object": {"sha": fields.get("sha")}}, jq)
+    sys.exit(0)
+
+match = re.fullmatch(r"repos/[^/]+/[^/]+/contents/(.*)\?ref=(.*)", path)
+if match and method == "GET":
+    rel, branch = match.groups()
+    file = state / "branches" / branch / rel
+    if file.is_file():
+        emit({"sha": blob_sha(file.read_bytes())}, jq)
+        sys.exit(0)
+    sys.stderr.write("gh: Not Found (HTTP 404)\n")
+    sys.exit(1)
+
+match = re.fullmatch(r"repos/[^/]+/[^/]+/git/ref/heads/(.+)", path)
+if match and method == "GET":
+    emit({"object": {"sha": "base-" + match.group(1)}}, jq)
+    sys.exit(0)
+
+match = re.fullmatch(r"repos/[^/]+/[^/]+/git/commits/(.+)", path)
+if match and method == "GET":
+    emit({"tree": {"sha": "tree-of-" + match.group(1)}}, jq)
+    sys.exit(0)
+
+if path.endswith("/branches") and method == "GET":
+    names = (state / "branch-names").read_text().split()
+    emit([{"name": n} for n in names], jq)
+    sys.exit(0)
+
+match = re.fullmatch(r"repos/[^/]+/[^/]+", path)
+if match and method == "GET":
+    emit({"default_branch": os.environ["FAKE_DEFAULT_BRANCH"]}, jq)
+    sys.exit(0)
+
+sys.exit(f"fake gh: nothing handles {method} {path}")

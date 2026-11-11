@@ -128,6 +128,10 @@ it omits, which is where a stale `skip` entry used to come from.
 there - `bash tests/template-sets.sh --update` - and reviewed with the change that caused it; the
 test fails otherwise, and it runs on every pull request.
 
+`tests/sync-loop.sh` covers the other half by running the sync against a stub `gh`: which templates
+become blobs, what each branch's tree adds and deletes, and the commit it writes. A loop that
+installs nothing reports "already matches this commit", so the sets alone cannot catch it.
+
 The sync targets **every version line** — each `<version>/main` and `<version>/development`, plus
 the repository's default branch. A workflow file only triggers on a branch that carries it (a push
 runs the file on the pushed branch, a pull request runs its base branch's copy), so writing only the
