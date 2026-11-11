@@ -50,7 +50,7 @@ version_lines() {
 }
 
 sync_repo() {
-  local repo="$1" product="$2" skip="$3" wants_labels="$4" prune="$5" types="$6" keep="$7"
+  local repo="$1" product="$2" skip="$3" wants_labels="$4" prune="$5" types="$6"
   local branch base_sha base_tree entries changed=0 rel blob current payload tree commit ref i
   local line name ok verdict reason template_types='{}'
   local -a branches=() paths=() blobs=()
@@ -62,9 +62,9 @@ sync_repo() {
   fi
 
   # Which check type a template belongs to (`$product/templates.jsonl`). A file the table does not
-  # name ships everywhere; `[]` marks a retired template only an explicit `keep` brings back; any
-  # other list ships it to the consumers whose types intersect it. That is what lets a consumer's
-  # `skip` shrink: it no longer has to enumerate every template of a type it does not take.
+  # name ships everywhere; any other list ships it to the consumers whose types intersect it, so an
+  # empty list ships nowhere. That is what lets a consumer's `skip` shrink: it no longer has to
+  # enumerate every template of a type it does not take.
   if [[ -f "$product/templates.jsonl" ]]; then
     if ! template_types=$(jq -s 'map({key: .path, value: .types}) | from_entries' \
       "$product/templates.jsonl"); then
@@ -90,7 +90,7 @@ sync_repo() {
 
     paths+=("$rel")
     blobs+=("$blob")
-  done < <(template_selection "$template_types" "$product/templates" "$skip" "$keep" "$types")
+  done < <(template_selection "$template_types" "$product/templates" "$skip" "$types")
 
   for branch in "${branches[@]}"; do
     base_sha=$(api "reading the tip of $branch" "repos/$repo/git/ref/heads/$branch" --jq .object.sha) || return 1
@@ -217,7 +217,7 @@ while IFS= read -r line; do
   fi
 
   echo "::group::$repo ($product)"
-  if ! sync_repo "$repo" "$product" "$(jq -c '.skip // []' <<<"$line")" "$(jq -r '.labels // true' <<<"$line")" "$(jq -c '.remove // []' <<<"$line")" "$(jq -c '.types // []' <<<"$line")" "$(jq -c '.keep // []' <<<"$line")"; then
+  if ! sync_repo "$repo" "$product" "$(jq -c '.skip // []' <<<"$line")" "$(jq -r '.labels // true' <<<"$line")" "$(jq -c '.remove // []' <<<"$line")" "$(jq -c '.types // []' <<<"$line")"; then
     echo "::error::$repo did not finish syncing"
     failed=1
   fi

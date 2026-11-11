@@ -119,7 +119,7 @@ status=$?
 
 for expected in \
   "skipping type2.yml (no beta type)" \
-  "skipping old.yml (retired template; name it in keep to restore)" \
+  "skipping old.yml (no type implies it)" \
   "Wrote 1 file(s) to acme/widget@1.0/development" \
   "Wrote 3 file(s) to acme/widget@1.0/main"
 do
