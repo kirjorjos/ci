@@ -1,7 +1,8 @@
 name: Build
 
 # For a repository that has no test harness yet: compile the jars and keep them, nothing else. The
-# shared matrix (`ci.yml`) is a contract about `checkModule`, `test<Loader>All` and a baseline tree,
+# shared matrix (the `matrix` type) is a contract about `checkModule`, `test<Loader>All` and a
+# baseline tree,
 # so a consumer that satisfies none of it would fail every job; this type asks only for `./gradlew
 # build`, which every Gradle mod already has.
 on:

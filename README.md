@@ -146,8 +146,14 @@ default branch would leave every older Minecraft line with no shared checks at a
 | `scripts` | pull request | `audit` |
 | `issues` | issue and issue-comment events | `version-check`, `confirm-version` |
 | `rules` | pull request, on `pull_request_target` | `check` |
+| `matrix` | not dispatched: called by a consumer's validation workflow, after its test slot | none — the type is a multi-job workflow, not an action |
 | `release-assets` | release workflows, by reference | `check` |
 | `slot` | not dispatched: called by a consumer's own jobs, plus the synced scheduler | `run` (`take`, `take-chore`, `release`, `event`) |
+
+`matrix` is not dispatched either, for the opposite reason: it is the expensive half of a pull
+request, and it has to run inside a run that already holds that version line's test slot. A
+dispatched copy would be a second, unslotted writer on the same line — which is what the slot exists
+to prevent.
 
 `release-assets` is not dispatched: it asserts a staged release set, so it belongs in a release job,
 not on a PR. Call it directly:
@@ -242,7 +248,8 @@ rules are exercised without a ruleset to break.
 ## Adding a type
 
 1. Add `<product>/types/<type>/<action>/action.yml` (composite; another product type must not be able
-   to reach it).
+   to reach it). A type that is only ever a reusable workflow (`matrix`) ships no action and skips
+   steps 2-3.
 2. Add `.github/workflows/type-<type>.yml` (`on: workflow_call`).
 3. Add one job to `.github/workflows/dispatch.yml` gated on
    `contains(fromJSON(needs.resolve.outputs.types), '<type>')` — `jobs.<id>.uses` cannot be built from
