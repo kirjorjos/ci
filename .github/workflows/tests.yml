@@ -27,3 +27,6 @@ jobs:
 
       - name: Compare every consumer's installed templates with the recorded set
         run: bash tests/template-sets.sh
+
+      - name: Exercise the sync's write loop against a stub gh
+        run: bash tests/sync-loop.sh
