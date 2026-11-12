@@ -41,7 +41,11 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      issues: read
+      # Write, not read: the job ensures the `release` label before it opens the promotion PR, and a
+      # label cannot be created with `issues: read`. Only the first release of a repository needs
+      # that - afterwards the label is already there - which is exactly the run that promotes a new
+      # line, so a read-only token failed the first release and never the second.
+      issues: write
       # Reading the post-merge chore's runs before a version's work starts.
       actions: read
     outputs:
