@@ -522,6 +522,11 @@ jobs:
       # (JDK 25 broke the 1.18.2/1.19.2 release on a Gradle 8.10 build). A line states its own JDK
       # in `.github/metadata.json`, the same field the matrix builds with, and one job can only set up
       # one JDK before the loop - so the lines being released must agree, like `docs/lua-api.md`.
+      #
+      # The JDK is read from the promotion's *source*, not from `main`: this step runs before the
+      # promotion PR is merged, and a line whose `main` predates `.github/metadata.json` - one that
+      # has never been promoted since the file was added - would otherwise fail here and never reach
+      # the merge that brings it over. After the merge both branches hold the same file anyway.
       - name: Read the JDK
         id: jdk
         env:
@@ -530,7 +535,7 @@ jobs:
           set -euo pipefail
           git fetch --force --prune --tags origin '+refs/heads/*:refs/remotes/origin/*'
           values="$(jq -r '.[].mc' <<<"$PLAN" | while read -r mc; do
-            git show "origin/$mc/main:.github/metadata.json" | jq -r '.build.jdk // 17'
+            git show "origin/$mc/development:.github/metadata.json" | jq -r '.build.jdk // 17'
           done | sort -u)"
           count="$(grep -c . <<<"$values" || true)"
           if [[ "$count" != "1" ]]; then
