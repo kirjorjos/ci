@@ -11,7 +11,13 @@
 # pull request; those types are gated to this event alone so nothing runs twice per push.
 name: Shared CI
 on:
+  # No `closed`: the run GitHub starts for a closing pull request has no jobs at all and is reported
+  # as a failed run, which is what every promotion PR left behind on the branch it promoted. Nothing
+  # needs that event - the checks belong to a pull request that still has commits to judge, and the
+  # post-merge push is what validates the branch afterwards. `pull_request_target` keeps `closed`
+  # because the rules type acts on a pull request closing.
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
   pull_request_target:
     types: [opened, reopened, synchronize, ready_for_review, closed]
   push:
