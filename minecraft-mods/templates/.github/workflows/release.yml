@@ -94,6 +94,13 @@ jobs:
           BUMP = os.environ["BUMP"]
           DRY = os.environ["DRY_RUN"] == "true"
 
+          # Every version write this job made that a promotion PR does not carry yet, as
+          # (mc, previous version). A failure between the bump and the PR would otherwise leave an
+          # incremented version on a PR-only branch with nothing released and no PR to finish it,
+          # and the next dispatch would bump the already-bumped number again (three failed attempts
+          # left RegistryExtractor at 0.0.4 with no tag).
+          BUMPS = []
+
 
           def run(cmd, check=True):
               return subprocess.run(cmd, text=True, capture_output=True, check=check)
@@ -313,6 +320,8 @@ jobs:
               import base64
 
               text = base64.b64decode(current["content"]).decode("utf-8")
+              found = re.search(r'^version[ \t]*=[ \t]*"(.*)"[ \t]*$', text, re.M)
+              previous = found.group(1) if found else None
               updated = re.sub(
                   r'^version[ \t]*=[ \t]*".*"[ \t]*$',
                   f'version = "{version}"',
@@ -334,6 +343,8 @@ jobs:
                   "api", "-X", "PUT", f"repos/{REPO}/contents/build.gradle.kts",
                   "--input", "/tmp/version.json",
               )
+              if previous:
+                  BUMPS.append((mc, previous))
               return True
 
 
@@ -471,10 +482,14 @@ jobs:
                           ).stdout.strip()
                           number = int(created.rstrip("/").split("/")[-1])
                       row["pr"] = number
+                      # The bump is carried by a PR that outlives this run, so a failure later in
+                      # this job must not undo it.
+                      BUMPS[:] = [item for item in BUMPS if item[0] != mc]
                       print(f'promotion PR #{number} for {mc} v{row["version"]}')
                   else:
                       create_main(mc)
                       row["pr"] = None
+                      BUMPS[:] = [item for item in BUMPS if item[0] != mc]
                       print(f'created {mc}/main from {mc}/development for v{row["version"]}')
 
               with open("/tmp/plan.json", "w", encoding="utf-8") as handle:
@@ -496,7 +511,26 @@ jobs:
               return 0
 
 
-          sys.exit(main())
+          try:
+              sys.exit(main())
+          except Exception as exc:
+              # A version write already landed on a PR-only branch; put it back before the job fails,
+              # so the next dispatch starts from the version this one found.
+              print(f"::error::prepare failed: {exc}")
+              pending, BUMPS[:] = list(BUMPS), []
+              for mc, previous in pending:
+                  try:
+                      write_version(mc, previous)
+                      print(
+                          f"::warning::{mc}/development: version {previous} put back; the failed "
+                          "prepare would otherwise have left it incremented with nothing released"
+                      )
+                  except Exception as restore_error:
+                      print(
+                          f"::error::{mc}/development: the version stays incremented; restoring "
+                          f"{previous} failed: {restore_error}"
+                      )
+              raise
           PY
           echo "plan=$(jq -c . /tmp/plan.json)" >> "$GITHUB_OUTPUT"
 
@@ -568,10 +602,16 @@ jobs:
           private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           permission-contents: write
+          # The merge below runs as the app, so it also needs to write pull requests.
+          permission-pull-requests: write
 
       - name: Merge the promotion PRs
         env:
-          GH_TOKEN: ${{ github.token }}
+          # The app's token, not `github.token`: a merge made with GITHUB_TOKEN pushes the merge
+          # commit without a push event, so `<mc>/main` never gets the post-merge shared checks the
+          # dispatcher's promotion rule counts on ("main validates again on the post-merge push").
+          # A push made by an app starts workflows like any other push.
+          GH_TOKEN: ${{ steps.app.outputs.token }}
           REPO: ${{ github.repository }}
           PLAN: ${{ needs.prepare.outputs.plan }}
         run: |
