@@ -157,14 +157,17 @@ jobs:
           fi
           echo "Comparing screenshots against $BASE ($base)"
 
+      # One entry per loader: this job is a matrix, and a key without the loader in it was written
+      # by whichever leg got there first and restored by the other two.
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts') }}
+          key: ${{ runner.os }}-gradle-${{ matrix.loader }}-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
+            ${{ runner.os }}-gradle-${{ matrix.loader }}-
             ${{ runner.os }}-gradle-
 
       - name: Work out this loader's tasks

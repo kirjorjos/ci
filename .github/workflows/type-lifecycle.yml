@@ -66,6 +66,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb
 
+      # Cold, a leg spends minutes fetching the wrapper, Minecraft and the loader before Gradle runs
+      # a task: 389 s against an empty GRADLE_USER_HOME and 35 s against a restored one, measured on
+      # `:forge-mod:classes` in Minecheck/1.19.2. The key names the loader because the three legs
+      # build three different toolchains - one shared key let whichever leg finished first keep it,
+      # and the others restored a cache written for someone else's loader. `gradle.properties` is in
+      # the hash and carries the Minecraft version, so the two version lines of one consumer stay
+      # apart as well. The wrapper's own properties are hashed too: without them a Gradle bump kept
+      # restoring the previous distribution.
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ matrix.loader }}-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-${{ matrix.loader }}-
+
       - name: Run the suite
         uses: kirjorjos/ci/minecraft-mods/types/lifecycle/run@minecraft-mods/v3
         with:
