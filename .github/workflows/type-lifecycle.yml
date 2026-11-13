@@ -77,12 +77,21 @@ jobs:
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
+          # Only the parts of the Gradle home that a warm run reuses: downloaded dependencies, the
+          # local build cache, the generated API jars and the wrapper's distribution. The loader
+          # trees beside them (`unimined`, `forge_gradle`, `fabric-loom`, `minecraft`, `ng_execute`)
+          # reach several GB each and are rebuilt from `modules-2` on a miss, so archiving the whole
+          # `caches` directory spent most of the archive's time and size on them.
           path: |
-            ~/.gradle/caches
+            ~/.gradle/caches/modules-2
+            ~/.gradle/caches/build-cache-1
+            ~/.gradle/caches/jars-*
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ matrix.loader }}-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
+          # `gradle-deps`: the path set above changed, and the older keys hold the whole-caches
+          # archive, which a restore would put back before this job ever saved the trimmed one.
+          key: ${{ runner.os }}-gradle-deps-${{ matrix.loader }}-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
-            ${{ runner.os }}-gradle-${{ matrix.loader }}-
+            ${{ runner.os }}-gradle-deps-${{ matrix.loader }}-
 
       - name: Run the suite
         uses: kirjorjos/ci/minecraft-mods/types/lifecycle/run@minecraft-mods/v3

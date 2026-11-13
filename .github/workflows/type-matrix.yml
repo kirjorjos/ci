@@ -104,12 +104,16 @@ jobs:
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
+          # The dependency cache, not the whole Gradle home: the loader trees beside `modules-2`
+          # (`unimined`, `forge_gradle`, `minecraft`, ...) reach several GB and are rebuilt on a miss.
           path: |
-            ~/.gradle/caches
+            ~/.gradle/caches/modules-2
+            ~/.gradle/caches/build-cache-1
+            ~/.gradle/caches/jars-*
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts') }}
+          key: ${{ runner.os }}-gradle-deps-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts') }}
           restore-keys: |
-            ${{ runner.os }}-gradle-
+            ${{ runner.os }}-gradle-deps-
 
       - name: Formatting and the plugin's own tests
         run: |
@@ -162,13 +166,17 @@ jobs:
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
+          # One entry per loader: the dependency cache, not the whole Gradle home, whose loader
+          # trees reach several GB and are rebuilt from `modules-2` on a miss.
           path: |
-            ~/.gradle/caches
+            ~/.gradle/caches/modules-2
+            ~/.gradle/caches/build-cache-1
+            ~/.gradle/caches/jars-*
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ matrix.loader }}-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-deps-${{ matrix.loader }}-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
-            ${{ runner.os }}-gradle-${{ matrix.loader }}-
-            ${{ runner.os }}-gradle-
+            ${{ runner.os }}-gradle-deps-${{ matrix.loader }}-
+            ${{ runner.os }}-gradle-deps-
 
       - name: Work out this loader's tasks
         id: names
@@ -308,12 +316,16 @@ jobs:
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
+          # The dependency cache, not the whole Gradle home: the loader trees beside `modules-2`
+          # (`unimined`, `forge_gradle`, `minecraft`, ...) reach several GB and are rebuilt on a miss.
           path: |
-            ~/.gradle/caches
+            ~/.gradle/caches/modules-2
+            ~/.gradle/caches/build-cache-1
+            ~/.gradle/caches/jars-*
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts') }}
+          key: ${{ runner.os }}-gradle-deps-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts') }}
           restore-keys: |
-            ${{ runner.os }}-gradle-
+            ${{ runner.os }}-gradle-deps-
 
       - name: Boot every packaged loader jar
         timeout-minutes: 45
