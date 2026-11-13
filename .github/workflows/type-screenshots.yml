@@ -69,6 +69,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb
 
+      # The same cold-start cost the lifecycle legs pay, so the same key: one entry per loader per
+      # hash of the build files, which is what keeps the three capture legs from sharing one cache.
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ matrix.loader }}-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-${{ matrix.loader }}-
+
       - name: Capture
         uses: kirjorjos/ci/minecraft-mods/types/screenshots/run@minecraft-mods/v3
         with:
