@@ -31,5 +31,8 @@ jobs:
       - name: Exercise the sync's write loop against a stub gh
         run: bash tests/sync-loop.sh
 
+      - name: Put the version back when a release prepare fails
+        run: bash tests/release-rollback.sh
+
       - name: Match every reported check name a ruleset can require
         run: bash tests/ruleset-contexts.sh
