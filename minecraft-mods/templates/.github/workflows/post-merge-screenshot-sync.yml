@@ -140,12 +140,16 @@ jobs:
         if: steps.guard.outputs.skip == 'false'
         uses: actions/cache@v4
         with:
+          # The dependency cache, not the whole Gradle home: the loader trees beside `modules-2`
+          # (`unimined`, `forge_gradle`, `minecraft`, ...) reach several GB and are rebuilt on a miss.
           path: |
-            ~/.gradle/caches
+            ~/.gradle/caches/modules-2
+            ~/.gradle/caches/build-cache-1
+            ~/.gradle/caches/jars-*
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts') }}
+          key: ${{ runner.os }}-gradle-deps-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts') }}
           restore-keys: |
-            ${{ runner.os }}-gradle-
+            ${{ runner.os }}-gradle-deps-
 
       - name: Resolve the merged pull request
         id: plan
