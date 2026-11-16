@@ -304,8 +304,11 @@ jobs:
         if: steps.plan.outputs.found == 'true'
         run: |
           set -euo pipefail
-          if git diff --quiet -- tests/baselines \
-            && [[ -z "$(git ls-files --others --exclude-standard tests/baselines)" ]]; then
+          # `git rm` stages its removal and `git diff` reports only unstaged work, so a run whose
+          # only finding was a deletion read a clean tree here and left the picture in place. The
+          # porcelain listing reads the index as well, which covers a staged deletion, a copied
+          # capture and an untouched picture in the one check.
+          if [[ -z "$(git status --porcelain -- tests/baselines)" ]]; then
             echo "The committed pictures already match what this merge produced - nothing to commit."
             echo "committed=false" >> "$GITHUB_OUTPUT"
             exit 0
