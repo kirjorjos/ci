@@ -69,6 +69,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb
 
+      # What this line needs on top of the shared image: the client has to open a window, and not
+      # every loader's GL stack is in the base image. Declared by the consumer, so this workflow
+      # stays loader-agnostic.
+      - name: Run the repository's setup steps
+        uses: kirjorjos/ci/minecraft-mods/setup@minecraft-mods/v3
+
       # The same cold-start cost the lifecycle legs pay, so the same key: one entry per loader per
       # hash of the build files, which is what keeps the three capture legs from sharing one cache.
       - name: Cache Gradle

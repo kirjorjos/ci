@@ -74,6 +74,7 @@ file or from the layout the product already assumes.
 | `build.jdk` | `matrix` | JDK the line builds with; default `17` |
 | `build.checkTask` | `matrix` | Gradle task covering formatting plus the plugin's own tests; default `checkModule` |
 | `release` | the consumer's `release.yml`, `release-assets` | jar prefix, name format, variants (`-deobf`) and staging directory |
+| `setup` | `lifecycle`, `screenshots` | shell commands run, in order, before the leg's task; for packages a line needs beyond the shared image |
 
 Every key is optional apart from `loaders`, and each default reproduces what the workflow ran
 before the key existed, so a line that declares none of them behaves exactly as it did. The release

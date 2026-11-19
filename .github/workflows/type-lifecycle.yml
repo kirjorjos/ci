@@ -66,6 +66,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb
 
+      # What this line needs on top of the shared image: the client has to open a window, and not
+      # every loader's GL stack is in the base image. Declared by the consumer, so this workflow
+      # stays loader-agnostic.
+      - name: Run the repository's setup steps
+        uses: kirjorjos/ci/minecraft-mods/setup@minecraft-mods/v3
+
       # Cold, a leg spends minutes fetching the wrapper, Minecraft and the loader before Gradle runs
       # a task: 389 s against an empty GRADLE_USER_HOME and 35 s against a restored one, measured on
       # `:forge-mod:classes` in Minecheck/1.19.2. The key names the loader because the three legs
