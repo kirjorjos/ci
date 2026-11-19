@@ -148,6 +148,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb
 
+      # A client leg needs more than xvfb: LWJGL 2 walks the screen's mode list at boot and the
+      # driver-less image lists none, so the consumer declares what its runner is missing.
+      - name: Run the repository's setup steps
+        uses: kirjorjos/ci/minecraft-mods/setup@minecraft-mods/v3
+
       - name: Use the base branch's baselines
         if: inputs.compare_baselines != ''
         run: |
