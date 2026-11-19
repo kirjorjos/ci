@@ -1,0 +1,11 @@
+name: Repository setup
+description: >-
+  Runs the commands a consumer lists in `.setup` in its `.github/metadata.json`. A runner image
+  carries the toolchain every consumer shares; a package one line needs to boot its own game is
+  declared by that line rather than installed for everybody.
+runs:
+  using: composite
+  steps:
+    - name: Run the declared setup steps
+      shell: bash
+      run: bash "${{ github.action_path }}/run.sh"
