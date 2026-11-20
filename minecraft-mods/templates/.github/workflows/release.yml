@@ -582,11 +582,40 @@ jobs:
           fi
           echo "jdk=$values" >> "$GITHUB_OUTPUT"
 
+      # Unimined asks Gradle for a Java 8 *toolchain* while it configures :forge-mod (the FG3 MCP
+      # config step runs under 8), so every old line provisions one from foojay at configuration
+      # time - the one network call a release cannot survive. A truncated Temurin 8 archive failed
+      # the 1.12.2 publish with "Cannot expand TAR ...OpenJDK8U-jdk_x64_linux_hotspot_8u514b01.tar
+      # .gz" *after* its promotion PR had merged, and the publish before it only got through
+      # because that download happened to be whole. Installed here and named to Gradle, the
+      # toolchain query finds it locally and nothing is provisioned.
+      #
+      # Before the line's own JDK: setup-java points JAVA_HOME at whatever it installed last, and
+      # Gradle 8.10 cannot start on 8. The home is kept aside for the registration below.
+      - name: Set up the legacy build JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "8"
+
+      - name: Keep the legacy JDK's home
+        run: |
+          set -euo pipefail
+          echo "LEGACY_JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
       - name: Set up JDK ${{ steps.jdk.outputs.jdk }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ steps.jdk.outputs.jdk }}
+
+      # What the toolchain query reads. A user-level gradle.properties is outside the checkout, so
+      # it cannot reach the tagged tree, and both gradlew invocations below see it.
+      - name: Register the legacy JDK with Gradle
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.gradle"
+          printf 'org.gradle.java.installations.paths=%s\n' "$LEGACY_JAVA_HOME" >> "$HOME/.gradle/gradle.properties"
 
       - name: Configure git
         run: |
