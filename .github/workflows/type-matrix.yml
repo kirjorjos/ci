@@ -95,11 +95,33 @@ jobs:
           ref: ${{ inputs.checkout_ref }}
           allow-unsafe-pr-checkout: ${{ inputs.checkout_ref != '' }}
 
+      # Unimined asks Gradle for a Java 8 toolchain while it configures a legacy loader module, so
+      # without one the build provisions Temurin 8 from foojay at configuration time - the download
+      # that has failed truncated and taken a green pull request red. Installed first, because
+      # setup-java points JAVA_HOME at whatever it installed last, and its home is named to Gradle
+      # after the line's JDK so the query is answered from the runner.
+      - name: Set up the legacy build JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "8"
+
+      - name: Keep the legacy JDK's home
+        run: |
+          set -euo pipefail
+          echo "LEGACY_JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
       - name: Set up JDK ${{ needs.plan.outputs.jdk }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ needs.plan.outputs.jdk }}
+
+      - name: Register the legacy JDK with Gradle
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.gradle"
+          printf 'org.gradle.java.installations.paths=%s\n' "$LEGACY_JAVA_HOME" >> "$HOME/.gradle/gradle.properties"
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -137,11 +159,33 @@ jobs:
           ref: ${{ inputs.checkout_ref }}
           allow-unsafe-pr-checkout: ${{ inputs.checkout_ref != '' }}
 
+      # Unimined asks Gradle for a Java 8 toolchain while it configures a legacy loader module, so
+      # without one the build provisions Temurin 8 from foojay at configuration time - the download
+      # that has failed truncated and taken a green pull request red. Installed first, because
+      # setup-java points JAVA_HOME at whatever it installed last, and its home is named to Gradle
+      # after the line's JDK so the query is answered from the runner.
+      - name: Set up the legacy build JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "8"
+
+      - name: Keep the legacy JDK's home
+        run: |
+          set -euo pipefail
+          echo "LEGACY_JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
       - name: Set up JDK ${{ needs.plan.outputs.jdk }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ needs.plan.outputs.jdk }}
+
+      - name: Register the legacy JDK with Gradle
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.gradle"
+          printf 'org.gradle.java.installations.paths=%s\n' "$LEGACY_JAVA_HOME" >> "$HOME/.gradle/gradle.properties"
 
       - name: Install xvfb
         run: |
@@ -312,11 +356,33 @@ jobs:
           ref: ${{ inputs.checkout_ref }}
           allow-unsafe-pr-checkout: ${{ inputs.checkout_ref != '' }}
 
+      # Unimined asks Gradle for a Java 8 toolchain while it configures a legacy loader module, so
+      # without one the build provisions Temurin 8 from foojay at configuration time - the download
+      # that has failed truncated and taken a green pull request red. Installed first, because
+      # setup-java points JAVA_HOME at whatever it installed last, and its home is named to Gradle
+      # after the line's JDK so the query is answered from the runner.
+      - name: Set up the legacy build JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "8"
+
+      - name: Keep the legacy JDK's home
+        run: |
+          set -euo pipefail
+          echo "LEGACY_JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
       - name: Set up JDK ${{ needs.plan.outputs.jdk }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ needs.plan.outputs.jdk }}
+
+      - name: Register the legacy JDK with Gradle
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.gradle"
+          printf 'org.gradle.java.installations.paths=%s\n' "$LEGACY_JAVA_HOME" >> "$HOME/.gradle/gradle.properties"
 
       - name: Cache Gradle
         uses: actions/cache@v4
