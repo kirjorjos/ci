@@ -251,6 +251,25 @@ jobs:
                 ;;
             esac
           done < <(jq -r '"\(.path | split("/")[2])\t\(.path)\t\(.class)"' "$MANIFEST")
+          # The capture profile is half of what a baseline set is: a difference in it fails every
+          # picture of that loader, and the manifest names pictures only, so nothing above ever
+          # writes it and the committed profile outlived the renderer it described. The artifact
+          # carries the run's profile beside its captures, one copy per loader whose captures this
+          # step fetched, so each of those writes it too.
+          for captures in "$RUNNER_TEMP"/captures/*; do
+            [[ -d "$captures" ]] || continue
+            loader="$(basename "$captures")"
+            src="$(find "$captures" -path '*/screenshots/profile.json' -type f -print -quit 2>/dev/null || true)"
+            [[ -n "$src" ]] || continue
+            path="tests/baselines/$loader/profile.json"
+            if cmp -s "$src" "$path"; then
+              continue
+            fi
+            mkdir -p "$(dirname "$path")"
+            cp "$src" "$path"
+            echo "wrote $path from $src"
+            changed=1
+          done
           if [[ "$changed" == "0" ]]; then
             echo "The manifest named nothing this tree still needs - nothing to write."
           fi
